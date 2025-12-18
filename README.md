@@ -2,7 +2,32 @@
 
 MCP server for [Nginx Proxy Manager](https://nginxproxymanager.com/) - manage your reverse proxy through AI assistants.
 
-## Installation
+## Quick Start (Docker)
+
+The easiest way to run the NPM MCP server - no cloning required!
+
+```bash
+# Download the compose file
+curl -O https://raw.githubusercontent.com/b3nw/nginx-proxy-manager-mcp/main/compose.yaml
+
+# Edit the environment variables, then start
+docker compose up -d
+```
+
+Or run directly:
+
+```bash
+docker run -d \
+  --name npm-mcp \
+  -p 8000:8000 \
+  -e NPM_API_URL=http://your-npm:81/api \
+  -e NPM_IDENTITY=admin@example.com \
+  -e NPM_SECRET=yourpassword \
+  -e NPM_MCP_TRANSPORT=http \
+  ghcr.io/b3nw/nginx-proxy-manager-mcp:latest
+```
+
+## Installation (Local)
 
 ```bash
 # Using uv (recommended)

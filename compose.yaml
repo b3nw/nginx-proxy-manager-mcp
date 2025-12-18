@@ -1,9 +1,8 @@
-# Example Docker Compose configuration for NPM MCP Server
-# This runs the MCP server in HTTP mode, suitable for remote AI agents
+# Docker Compose configuration for NPM MCP Server
 
 services:
   npm-mcp:
-    build: .
+    image: ghcr.io/b3nw/nginx-proxy-manager-mcp:latest
     container_name: npm-mcp
     restart: unless-stopped
     ports:
@@ -40,7 +39,7 @@ services:
 #       - npm_letsencrypt:/etc/letsencrypt
 #
 #   npm-mcp:
-#     build: .
+#     image: ghcr.io/b3nw/nginx-proxy-manager-mcp:latest
 #     environment:
 #       - NPM_API_URL=http://nginx-proxy-manager:81/api
 #       - NPM_IDENTITY=admin@example.com
