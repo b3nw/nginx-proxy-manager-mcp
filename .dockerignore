@@ -1,0 +1,16 @@
+# Docker ignore - exclude unnecessary files from build context
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.git/
+.gitignore
+.env
+*.md
+!README.md
+tests/
+.pytest_cache/
+.coverage
+.idea/
+.vscode/

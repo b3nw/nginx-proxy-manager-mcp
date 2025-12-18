@@ -1,0 +1,53 @@
+# Example Docker Compose configuration for NPM MCP Server
+# This runs the MCP server in HTTP mode, suitable for remote AI agents
+
+services:
+  npm-mcp:
+    build: .
+    container_name: npm-mcp
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Required: NPM API connection
+      - NPM_API_URL=http://nginx-proxy-manager:81/api
+      - NPM_IDENTITY=admin@example.com
+      - NPM_SECRET=changeme
+      # Optional: Server configuration
+      - NPM_MCP_TRANSPORT=http
+      - NPM_MCP_HOST=0.0.0.0
+      - NPM_MCP_PORT=8000
+    # Uncomment to use .env file instead of inline environment
+    # env_file:
+    #   - .env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/mcp', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# Example: Running alongside NPM in same compose stack
+# services:
+#   nginx-proxy-manager:
+#     image: jc21/nginx-proxy-manager:latest
+#     ports:
+#       - "80:80"
+#       - "443:443"
+#       - "81:81"
+#     volumes:
+#       - npm_data:/data
+#       - npm_letsencrypt:/etc/letsencrypt
+#
+#   npm-mcp:
+#     build: .
+#     environment:
+#       - NPM_API_URL=http://nginx-proxy-manager:81/api
+#       - NPM_IDENTITY=admin@example.com
+#       - NPM_SECRET=changeme
+#     depends_on:
+#       - nginx-proxy-manager
+#
+# volumes:
+#   npm_data:
+#   npm_letsencrypt:
