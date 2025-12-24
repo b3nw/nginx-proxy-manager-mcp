@@ -11,12 +11,14 @@ DEFAULT_PROXY_SETTINGS: dict[str, Any] = {
     "certificate_id": 0,
     "ssl_forced": True,
     "hsts_enabled": True,
+    "hsts_subdomains": False,
     "http2_support": True,
     "caching_enabled": False,
     "block_exploits": True,
     "allow_websocket_upgrade": True,
     "access_list_id": 0,
     "advanced_config": "",
+    "meta": {},
 }
 
 
