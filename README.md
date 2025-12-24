@@ -49,7 +49,40 @@ NPM_SECRET=yourpassword
 # Optional: Server settings
 NPM_MCP_PORT=8000
 NPM_MCP_TRANSPORT=stdio  # or "http"
+
+# Optional: Default values for create_proxy_host (JSON)
+NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true}'
 ```
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `NPM_API_URL` | Yes | `http://localhost:81/api` | NPM API endpoint |
+| `NPM_IDENTITY` | Yes | - | NPM user email |
+| `NPM_SECRET` | Yes | - | NPM user password |
+| `NPM_MCP_HOST` | No | `0.0.0.0` | MCP server bind address |
+| `NPM_MCP_PORT` | No | `8000` | MCP server port |
+| `NPM_MCP_TRANSPORT` | No | `stdio` | Transport mode (`stdio` or `http`) |
+| `NPM_PROXY_DEFAULTS` | No | `{}` | JSON defaults for `create_proxy_host` |
+
+### NPM_PROXY_DEFAULTS Keys
+
+Configure default values for proxy host creation:
+
+```bash
+NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true, "block_exploits": true}'
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `forward_scheme` | string | `"http"` | Backend protocol (`http` or `https`) |
+| `certificate_id` | int | `0` | SSL certificate ID (use `list_certificates` to find) |
+| `ssl_forced` | bool | `true` | Force HTTPS redirect |
+| `block_exploits` | bool | `true` | Enable common exploit blocking |
+| `allow_websocket_upgrade` | bool | `true` | Allow WebSocket connections |
+| `access_list_id` | int | `0` | Access list ID (use `list_access_lists` to find) |
+| `advanced_config` | string | `""` | Custom nginx configuration block |
 
 ## Usage
 
@@ -95,6 +128,9 @@ Add to your `claude_desktop_config.json`:
 | `get_proxy_host_details` | Get full config for a specific host |
 | `get_system_health` | Check NPM version and status |
 | `search_audit_logs` | Query audit log entries |
+| `list_certificates` | List SSL certificates |
+| `list_access_lists` | List access lists for authentication/IP restrictions |
+| `create_proxy_host` | Create a new proxy host |
 
 ## Development
 
