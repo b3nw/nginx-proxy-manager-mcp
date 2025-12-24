@@ -346,9 +346,13 @@ async def create_proxy_host(
             if certificate_id is not None
             else defaults["certificate_id"],
             ssl_forced=ssl_forced if ssl_forced is not None else defaults["ssl_forced"],
+            hsts_enabled=defaults.get("hsts_enabled", True),
+            hsts_subdomains=defaults.get("hsts_subdomains", False),
+            http2_support=defaults.get("http2_support", True),
             block_exploits=block_exploits
             if block_exploits is not None
             else defaults["block_exploits"],
+            caching_enabled=defaults.get("caching_enabled", False),
             allow_websocket_upgrade=allow_websocket_upgrade
             if allow_websocket_upgrade is not None
             else defaults["allow_websocket_upgrade"],
@@ -358,6 +362,7 @@ async def create_proxy_host(
             advanced_config=advanced_config
             if advanced_config is not None
             else defaults["advanced_config"],
+            meta=defaults.get("meta", {}),
         )
 
         domains = ", ".join(host.domain_names)
