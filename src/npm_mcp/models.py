@@ -34,6 +34,18 @@ class Owner(BaseModel):
     roles: list[str]
 
 
+class AccessList(BaseModel):
+    """Access list for authentication/IP restrictions."""
+
+    id: int
+    created_on: datetime
+    modified_on: datetime
+    owner_user_id: int = 0
+    name: str
+    satisfy_any: bool = False
+    pass_auth: bool = False
+
+
 class Certificate(BaseModel):
     """SSL Certificate information."""
 
@@ -81,7 +93,7 @@ class ProxyHost(BaseModel):
     advanced_config: str = ""
     enabled: bool = True
     meta: dict[str, Any] = Field(default_factory=dict)
-    locations: list[ProxyHostLocation] = Field(default_factory=list)
+    locations: list[ProxyHostLocation] | None = None
     # Optional expanded relations
     owner: Owner | None = None
     certificate: Certificate | None = None

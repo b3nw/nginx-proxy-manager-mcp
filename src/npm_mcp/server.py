@@ -179,7 +179,7 @@ async def get_system_health() -> str:
         try:
             await client._ensure_authenticated()
             result.append("Authenticated: ✅")
-            
+
             # Try to get settings (admin only)
             try:
                 settings_list = await client.get_settings()
@@ -253,11 +253,126 @@ async def list_certificates() -> str:
                 expiry = f" (expires: {cert.expires_on.strftime('%Y-%m-%d')})"
 
             result.append(
-                f"[{cert.id}] {cert.nice_name} ({cert.provider})\n"
-                f"   Domains: {domains}{expiry}"
+                f"[{cert.id}] {cert.nice_name} ({cert.provider})\n   Domains: {domains}{expiry}"
             )
 
         return f"Found {len(certs)} certificate(s):\n\n" + "\n\n".join(result)
+
+    except Exception as e:
+        return _format_error(e)
+
+
+@mcp.tool()
+async def list_access_lists() -> str:
+    """List all access lists configured in Nginx Proxy Manager.
+
+    Returns a summary of all access lists including their IDs and names.
+    Use these IDs when creating proxy hosts that require access control.
+    """
+    try:
+        client = get_client()
+        access_lists = await client.get_access_lists()
+
+        if not access_lists:
+            return "No access lists configured."
+
+        result = []
+        for al in access_lists:
+            result.append(f"[{al.id}] {al.name}")
+
+        return f"Found {len(access_lists)} access list(s):\n\n" + "\n".join(result)
+
+    except Exception as e:
+        return _format_error(e)
+
+
+@mcp.tool()
+async def create_proxy_host(
+    domain_names: list[str],
+    forward_host: str,
+    forward_port: int,
+    forward_scheme: str | None = None,
+    certificate_id: int | None = None,
+    ssl_forced: bool | None = None,
+    block_exploits: bool | None = None,
+    allow_websocket_upgrade: bool | None = None,
+    access_list_id: int | None = None,
+    advanced_config: str | None = None,
+) -> str:
+    """Create a new proxy host in Nginx Proxy Manager.
+
+    Args:
+        domain_names: List of domain names (e.g., ["app.ext.ben.io"])
+        forward_host: Backend host/IP to forward to (e.g., "192.168.1.100" or "container-name")
+        forward_port: Backend port to forward to (e.g., 8080)
+        forward_scheme: Backend protocol - "http" or "https" (default from config)
+        certificate_id: SSL certificate ID. Use list_certificates to find available certs.
+                       Use 0 for no SSL, or the ID of a wildcard cert. (default from config)
+        ssl_forced: Force HTTPS redirect (default from config)
+        block_exploits: Enable common exploit blocking (default from config)
+        allow_websocket_upgrade: Allow WebSocket connections (default from config)
+        access_list_id: Access list ID for authentication. Use list_access_lists to find.
+                       Use 0 for no access restrictions. (default from config)
+        advanced_config: Custom nginx configuration block (default from config)
+
+    Returns:
+        Details of the created proxy host including the new host ID.
+
+    Note:
+        Default values can be configured via NPM_PROXY_DEFAULTS environment variable.
+        Example: NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true}'
+
+    Example:
+        create_proxy_host(
+            domain_names=["myapp.ext.ben.io"],
+            forward_host="10.0.0.50",
+            forward_port=3000,
+            certificate_id=24,  # *.ext.ben.io wildcard
+        )
+    """
+    try:
+        # Get defaults from config, then override with provided values
+        defaults = settings.get_proxy_defaults()
+
+        client = get_client()
+        host = await client.create_proxy_host(
+            domain_names=domain_names,
+            forward_host=forward_host,
+            forward_port=forward_port,
+            forward_scheme=forward_scheme
+            if forward_scheme is not None
+            else defaults["forward_scheme"],
+            certificate_id=certificate_id
+            if certificate_id is not None
+            else defaults["certificate_id"],
+            ssl_forced=ssl_forced if ssl_forced is not None else defaults["ssl_forced"],
+            hsts_enabled=defaults.get("hsts_enabled", True),
+            hsts_subdomains=defaults.get("hsts_subdomains", False),
+            http2_support=defaults.get("http2_support", True),
+            block_exploits=block_exploits
+            if block_exploits is not None
+            else defaults["block_exploits"],
+            caching_enabled=defaults.get("caching_enabled", False),
+            allow_websocket_upgrade=allow_websocket_upgrade
+            if allow_websocket_upgrade is not None
+            else defaults["allow_websocket_upgrade"],
+            access_list_id=access_list_id
+            if access_list_id is not None
+            else defaults["access_list_id"],
+            advanced_config=advanced_config
+            if advanced_config is not None
+            else defaults["advanced_config"],
+            meta=defaults.get("meta", {}),
+        )
+
+        domains = ", ".join(host.domain_names)
+        return (
+            f"Successfully created proxy host!\n\n"
+            f"ID: {host.id}\n"
+            f"Domains: {domains}\n"
+            f"Forward: {host.forward_scheme}://{host.forward_host}:{host.forward_port}\n"
+            f"SSL: {'Enabled' if host.ssl_forced else 'Disabled'}"
+        )
 
     except Exception as e:
         return _format_error(e)
