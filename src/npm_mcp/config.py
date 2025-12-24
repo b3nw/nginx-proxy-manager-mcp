@@ -1,6 +1,20 @@
 """Configuration management using pydantic-settings."""
 
+from typing import Any
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Default values for proxy host creation
+DEFAULT_PROXY_SETTINGS: dict[str, Any] = {
+    "forward_scheme": "http",
+    "certificate_id": 0,
+    "ssl_forced": True,
+    "block_exploits": True,
+    "allow_websocket_upgrade": True,
+    "access_list_id": 0,
+    "advanced_config": "",
+}
 
 
 class Settings(BaseSettings):
@@ -22,6 +36,31 @@ class Settings(BaseSettings):
     mcp_host: str = "0.0.0.0"
     mcp_port: int = 8000
     mcp_transport: str = "stdio"  # "stdio" or "http"
+
+    # Proxy host creation defaults (JSON string)
+    # Example: '{"certificate_id": 24, "ssl_forced": true}'
+    proxy_defaults: dict[str, Any] = {}
+
+    @field_validator("proxy_defaults", mode="before")
+    @classmethod
+    def parse_proxy_defaults(cls, v: Any) -> dict[str, Any]:
+        """Parse JSON string to dict, or pass through if already dict."""
+        if isinstance(v, dict):
+            return v
+        if isinstance(v, str) and v.strip():
+            import json
+
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in NPM_PROXY_DEFAULTS: {e}") from e
+        return {}
+
+    def get_proxy_defaults(self) -> dict[str, Any]:
+        """Get merged proxy defaults (base defaults + user overrides)."""
+        merged = DEFAULT_PROXY_SETTINGS.copy()
+        merged.update(self.proxy_defaults)
+        return merged
 
 
 settings = Settings()

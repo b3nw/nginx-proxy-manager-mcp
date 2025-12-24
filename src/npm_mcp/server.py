@@ -291,13 +291,13 @@ async def create_proxy_host(
     domain_names: list[str],
     forward_host: str,
     forward_port: int,
-    forward_scheme: str = "http",
-    certificate_id: int = 0,
-    ssl_forced: bool = True,
-    block_exploits: bool = True,
-    allow_websocket_upgrade: bool = True,
-    access_list_id: int = 0,
-    advanced_config: str = "",
+    forward_scheme: str | None = None,
+    certificate_id: int | None = None,
+    ssl_forced: bool | None = None,
+    block_exploits: bool | None = None,
+    allow_websocket_upgrade: bool | None = None,
+    access_list_id: int | None = None,
+    advanced_config: str | None = None,
 ) -> str:
     """Create a new proxy host in Nginx Proxy Manager.
 
@@ -305,18 +305,22 @@ async def create_proxy_host(
         domain_names: List of domain names (e.g., ["app.ext.ben.io"])
         forward_host: Backend host/IP to forward to (e.g., "192.168.1.100" or "container-name")
         forward_port: Backend port to forward to (e.g., 8080)
-        forward_scheme: Backend protocol - "http" or "https" (default: "http")
+        forward_scheme: Backend protocol - "http" or "https" (default from config)
         certificate_id: SSL certificate ID. Use list_certificates to find available certs.
-                       Use 0 for no SSL, or the ID of a matching wildcard cert.
-        ssl_forced: Force HTTPS redirect (default: True)
-        block_exploits: Enable common exploit blocking (default: True)
-        allow_websocket_upgrade: Allow WebSocket connections (default: True)
+                       Use 0 for no SSL, or the ID of a wildcard cert. (default from config)
+        ssl_forced: Force HTTPS redirect (default from config)
+        block_exploits: Enable common exploit blocking (default from config)
+        allow_websocket_upgrade: Allow WebSocket connections (default from config)
         access_list_id: Access list ID for authentication. Use list_access_lists to find.
-                       Use 0 for no access restrictions (default: 0)
-        advanced_config: Custom nginx configuration block (default: "")
+                       Use 0 for no access restrictions. (default from config)
+        advanced_config: Custom nginx configuration block (default from config)
 
     Returns:
-        JSON with created proxy host details including the new host ID.
+        Details of the created proxy host including the new host ID.
+
+    Note:
+        Default values can be configured via NPM_PROXY_DEFAULTS environment variable.
+        Example: NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true}'
 
     Example:
         create_proxy_host(
@@ -324,22 +328,36 @@ async def create_proxy_host(
             forward_host="10.0.0.50",
             forward_port=3000,
             certificate_id=24,  # *.ext.ben.io wildcard
-            ssl_forced=True
         )
     """
     try:
+        # Get defaults from config, then override with provided values
+        defaults = settings.get_proxy_defaults()
+
         client = get_client()
         host = await client.create_proxy_host(
             domain_names=domain_names,
             forward_host=forward_host,
             forward_port=forward_port,
-            forward_scheme=forward_scheme,
-            certificate_id=certificate_id,
-            ssl_forced=ssl_forced,
-            block_exploits=block_exploits,
-            allow_websocket_upgrade=allow_websocket_upgrade,
-            access_list_id=access_list_id,
-            advanced_config=advanced_config,
+            forward_scheme=forward_scheme
+            if forward_scheme is not None
+            else defaults["forward_scheme"],
+            certificate_id=certificate_id
+            if certificate_id is not None
+            else defaults["certificate_id"],
+            ssl_forced=ssl_forced if ssl_forced is not None else defaults["ssl_forced"],
+            block_exploits=block_exploits
+            if block_exploits is not None
+            else defaults["block_exploits"],
+            allow_websocket_upgrade=allow_websocket_upgrade
+            if allow_websocket_upgrade is not None
+            else defaults["allow_websocket_upgrade"],
+            access_list_id=access_list_id
+            if access_list_id is not None
+            else defaults["access_list_id"],
+            advanced_config=advanced_config
+            if advanced_config is not None
+            else defaults["advanced_config"],
         )
 
         domains = ", ".join(host.domain_names)
