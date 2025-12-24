@@ -93,7 +93,7 @@ class ProxyHost(BaseModel):
     advanced_config: str = ""
     enabled: bool = True
     meta: dict[str, Any] = Field(default_factory=dict)
-    locations: list[ProxyHostLocation] = Field(default_factory=list)
+    locations: list[ProxyHostLocation] | None = None
     # Optional expanded relations
     owner: Owner | None = None
     certificate: Certificate | None = None
