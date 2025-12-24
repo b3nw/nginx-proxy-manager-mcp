@@ -13,6 +13,7 @@ from .exceptions import (
     NpmNotFoundError,
 )
 from .models import (
+    AccessList,
     AuditLogEntry,
     Certificate,
     HealthStatus,
@@ -92,9 +93,7 @@ class NpmClient:
             raise NpmAuthenticationError("Invalid credentials")
 
         if response.status_code != 200:
-            raise NpmApiError(
-                f"Login failed: {response.text}", status_code=response.status_code
-            )
+            raise NpmApiError(f"Login failed: {response.text}", status_code=response.status_code)
 
         data = response.json()
         token_response = TokenResponse(**data)
@@ -172,9 +171,7 @@ class NpmClient:
             raise NpmNotFoundError(f"Resource not found: {endpoint}")
 
         if response.status_code >= 400:
-            raise NpmApiError(
-                f"API error: {response.text}", status_code=response.status_code
-            )
+            raise NpmApiError(f"API error: {response.text}", status_code=response.status_code)
 
         return response
 
@@ -259,3 +256,70 @@ class NpmClient:
         )
         data = response.json()
         return [AuditLogEntry(**entry) for entry in data]
+
+    async def get_access_lists(self) -> list[AccessList]:
+        """Get all access lists."""
+        response = await self._request("GET", "/nginx/access-lists")
+        data = response.json()
+        return [AccessList(**item) for item in data]
+
+    async def create_proxy_host(
+        self,
+        domain_names: list[str],
+        forward_host: str,
+        forward_port: int,
+        forward_scheme: str = "http",
+        certificate_id: int | None = None,
+        ssl_forced: bool = True,
+        hsts_enabled: bool = True,
+        hsts_subdomains: bool = False,
+        http2_support: bool = True,
+        block_exploits: bool = True,
+        caching_enabled: bool = False,
+        allow_websocket_upgrade: bool = True,
+        access_list_id: int = 0,
+        advanced_config: str = "",
+        meta: dict | None = None,
+    ) -> ProxyHost:
+        """Create a new proxy host.
+
+        Args:
+            domain_names: List of domain names for this host
+            forward_host: Backend host to forward to
+            forward_port: Backend port to forward to
+            forward_scheme: http or https
+            certificate_id: SSL certificate ID (0 for none, use list_certificates to find)
+            ssl_forced: Force SSL/HTTPS
+            hsts_enabled: Enable HSTS
+            hsts_subdomains: Include subdomains in HSTS
+            http2_support: Enable HTTP/2
+            block_exploits: Enable exploit blocking
+            caching_enabled: Enable caching
+            allow_websocket_upgrade: Allow WebSocket upgrades
+            access_list_id: Access list ID (0 for none, use list_access_lists to find)
+            advanced_config: Custom nginx configuration
+            meta: Additional metadata
+
+        Returns:
+            Created ProxyHost object
+        """
+        payload = {
+            "domain_names": domain_names,
+            "forward_host": forward_host,
+            "forward_port": forward_port,
+            "forward_scheme": forward_scheme,
+            "certificate_id": certificate_id or 0,
+            "ssl_forced": ssl_forced,
+            "hsts_enabled": hsts_enabled,
+            "hsts_subdomains": hsts_subdomains,
+            "http2_support": http2_support,
+            "block_exploits": block_exploits,
+            "caching_enabled": caching_enabled,
+            "allow_websocket_upgrade": allow_websocket_upgrade,
+            "access_list_id": access_list_id,
+            "advanced_config": advanced_config,
+            "meta": meta or {},
+        }
+
+        response = await self._request("POST", "/nginx/proxy-hosts", json=payload)
+        return ProxyHost(**response.json())
