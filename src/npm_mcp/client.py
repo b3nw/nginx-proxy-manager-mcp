@@ -323,3 +323,72 @@ class NpmClient:
 
         response = await self._request("POST", "/nginx/proxy-hosts", json=payload)
         return ProxyHost(**response.json())
+
+    async def update_proxy_host(
+        self,
+        host_id: int,
+        **kwargs,
+    ) -> ProxyHost:
+        """Update an existing proxy host.
+
+        Args:
+            host_id: The proxy host ID to update
+            **kwargs: Fields to update (same as create_proxy_host)
+
+        Returns:
+            Updated ProxyHost object
+        """
+        # Get existing host to merge with updates
+        existing = await self.get_proxy_host(host_id)
+        payload = {
+            "domain_names": existing.domain_names,
+            "forward_host": existing.forward_host,
+            "forward_port": existing.forward_port,
+            "forward_scheme": existing.forward_scheme,
+            "certificate_id": existing.certificate_id or 0,
+            "ssl_forced": existing.ssl_forced,
+            "hsts_enabled": existing.hsts_enabled,
+            "hsts_subdomains": existing.hsts_subdomains,
+            "http2_support": existing.http2_support,
+            "block_exploits": existing.block_exploits,
+            "caching_enabled": existing.caching_enabled,
+            "allow_websocket_upgrade": existing.allow_websocket_upgrade,
+            "access_list_id": existing.access_list_id,
+            "advanced_config": existing.advanced_config,
+            "meta": existing.meta,
+        }
+        payload.update({k: v for k, v in kwargs.items() if v is not None})
+
+        response = await self._request("PUT", f"/nginx/proxy-hosts/{host_id}", json=payload)
+        return ProxyHost(**response.json())
+
+    async def create_certificate(
+        self,
+        domain_names: list[str],
+        email: str,
+        provider: str = "letsencrypt",
+        dns_challenge: bool = False,
+    ) -> Certificate:
+        """Create/provision a new SSL certificate.
+
+        Args:
+            domain_names: List of domain names for the certificate
+            email: Email address for Let's Encrypt notifications
+            provider: Certificate provider (default: "letsencrypt")
+            dns_challenge: Use DNS challenge instead of HTTP (default: False)
+
+        Returns:
+            Created Certificate object
+        """
+        payload = {
+            "domain_names": domain_names,
+            "meta": {
+                "letsencrypt_email": email,
+                "letsencrypt_agree": True,
+                "dns_challenge": dns_challenge,
+            },
+            "provider": provider,
+        }
+
+        response = await self._request("POST", "/nginx/certificates", json=payload)
+        return Certificate(**response.json())
