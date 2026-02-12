@@ -131,6 +131,8 @@ Add to your `claude_desktop_config.json`:
 | `list_certificates` | List SSL certificates |
 | `list_access_lists` | List access lists for authentication/IP restrictions |
 | `create_proxy_host` | Create a new proxy host |
+| `update_proxy_host` | Update an existing proxy host (v0.0.3+) |
+| `create_certificate` | Provision a new Let's Encrypt SSL certificate (v0.0.3+) |
 
 ## Development
 

@@ -23,15 +23,15 @@ class UserMeta(BaseModel):
 class Owner(BaseModel):
     """Proxy host owner information."""
 
-    id: int
-    created_on: datetime
-    modified_on: datetime
-    is_disabled: bool
-    email: str
-    name: str
-    nickname: str
-    avatar: str
-    roles: list[str]
+    id: int | None = None
+    created_on: datetime | None = None
+    modified_on: datetime | None = None
+    is_disabled: bool = False
+    email: str | None = None
+    name: str = ""
+    nickname: str = ""
+    avatar: str = ""
+    roles: list[str] = Field(default_factory=list)
 
 
 class AccessList(BaseModel):
@@ -49,13 +49,13 @@ class AccessList(BaseModel):
 class Certificate(BaseModel):
     """SSL Certificate information."""
 
-    id: int
-    created_on: datetime
-    modified_on: datetime
-    owner_user_id: int
-    provider: str
-    nice_name: str
-    domain_names: list[str]
+    id: int | None = None
+    created_on: datetime | None = None
+    modified_on: datetime | None = None
+    owner_user_id: int | None = None
+    provider: str = ""
+    nice_name: str = ""
+    domain_names: list[str] = Field(default_factory=list)
     expires_on: datetime | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
 
