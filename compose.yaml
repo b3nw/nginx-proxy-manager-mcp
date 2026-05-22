@@ -16,6 +16,11 @@ services:
       - NPM_MCP_TRANSPORT=http
       - NPM_MCP_HOST=0.0.0.0
       - NPM_MCP_PORT=8000
+      # Optional: Log access (requires volume mount below)
+      # - NPM_LOG_DIR=/data/npm-logs
+    # volumes:
+    #   # Mount NPM's log directory for get_proxy_host_logs tool (read-only)
+    #   - npm_data:/data/npm-logs:ro    # named volume — see "Log Access" in README
     # Uncomment to use .env file instead of inline environment
     # env_file:
     #   - .env
@@ -26,7 +31,7 @@ services:
       retries: 3
       start_period: 10s
 
-# Example: Running alongside NPM in same compose stack
+# Example: Running alongside NPM in same compose stack (with log access)
 # services:
 #   nginx-proxy-manager:
 #     image: jc21/nginx-proxy-manager:latest
@@ -44,6 +49,9 @@ services:
 #       - NPM_API_URL=http://nginx-proxy-manager:81/api
 #       - NPM_IDENTITY=admin@example.com
 #       - NPM_SECRET=changeme
+#       - NPM_LOG_DIR=/data/npm-logs
+#     volumes:
+#       - npm_data:/data/npm-logs:ro
 #     depends_on:
 #       - nginx-proxy-manager
 #

@@ -64,6 +64,7 @@ NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true}'
 | `NPM_MCP_HOST` | No | `0.0.0.0` | MCP server bind address |
 | `NPM_MCP_PORT` | No | `8000` | MCP server port |
 | `NPM_MCP_TRANSPORT` | No | `stdio` | Transport mode (`stdio` or `http`) |
+| `NPM_LOG_DIR` | No | - | Path to mounted NPM log directory (enables `get_proxy_host_logs`) |
 | `NPM_PROXY_DEFAULTS` | No | `{}` | JSON defaults for `create_proxy_host` |
 
 ### NPM_PROXY_DEFAULTS Keys
@@ -126,6 +127,7 @@ Add to your `claude_desktop_config.json`:
 |------|-------------|
 | `list_proxy_hosts` | List all proxy hosts |
 | `get_proxy_host_details` | Get full config for a specific host |
+| `get_proxy_host_logs` | Retrieve nginx access/error logs for a proxy host (requires log mount) |
 | `get_system_health` | Check NPM version and status |
 | `search_audit_logs` | Query audit log entries |
 | `list_certificates` | List SSL certificates |
@@ -133,6 +135,93 @@ Add to your `claude_desktop_config.json`:
 | `create_proxy_host` | Create a new proxy host |
 | `update_proxy_host` | Update an existing proxy host (v0.0.3+) |
 | `create_certificate` | Provision a new Let's Encrypt SSL certificate (v0.0.3+) |
+
+## Log Access Setup
+
+The `get_proxy_host_logs` tool reads nginx log files directly from disk. Since NPM has no API for log retrieval, you need to mount NPM's log directory into the MCP container.
+
+NPM writes per-host logs to `/data/logs/` inside its container:
+- `proxy-host-{id}_access.log` — HTTP request log (client IP, status, path, user agent)
+- `proxy-host-{id}_error.log` — nginx error log (upstream failures, config issues)
+
+### Docker Compose (same stack)
+
+If NPM and the MCP server share a compose stack with a named volume:
+
+```yaml
+services:
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    volumes:
+      - npm_data:/data
+
+  npm-mcp:
+    image: ghcr.io/b3nw/nginx-proxy-manager-mcp:latest
+    environment:
+      - NPM_API_URL=http://nginx-proxy-manager:81/api
+      - NPM_IDENTITY=admin@example.com
+      - NPM_SECRET=yourpassword
+      - NPM_LOG_DIR=/data/npm-logs
+    volumes:
+      # Mount NPM's /data volume — logs are in /data/logs/ inside it
+      - npm_data:/data/npm-logs:ro
+    depends_on:
+      - nginx-proxy-manager
+
+volumes:
+  npm_data:
+```
+
+> **Note:** NPM stores logs under `/data/logs/` inside its data volume. When you
+> mount the full `/data` volume to `/data/npm-logs`, the MCP server looks for logs at
+> `/data/npm-logs/logs/`. Set `NPM_LOG_DIR` to match your mount path plus `/logs`.
+
+If you mounted the full data volume:
+
+```bash
+NPM_LOG_DIR=/data/npm-logs/logs
+```
+
+### Bind Mount (separate stacks)
+
+If NPM uses a bind mount (e.g., `./npm-data:/data`), mount the logs subdirectory directly:
+
+```yaml
+npm-mcp:
+  volumes:
+    - /path/to/npm-data/logs:/data/npm-logs:ro
+  environment:
+    - NPM_LOG_DIR=/data/npm-logs
+```
+
+### Docker Run
+
+```bash
+docker run -d \
+  --name npm-mcp \
+  -p 8000:8000 \
+  -v npm_data:/data/npm-logs:ro \
+  -e NPM_API_URL=http://your-npm:81/api \
+  -e NPM_IDENTITY=admin@example.com \
+  -e NPM_SECRET=yourpassword \
+  -e NPM_LOG_DIR=/data/npm-logs/logs \
+  -e NPM_MCP_TRANSPORT=http \
+  ghcr.io/b3nw/nginx-proxy-manager-mcp:latest
+```
+
+### Local Development (non-Docker)
+
+Point `NPM_LOG_DIR` at wherever NPM's logs are on your filesystem:
+
+```bash
+NPM_LOG_DIR=/path/to/npm/data/logs npm-mcp
+```
+
+### Verifying the Mount
+
+After starting, call `get_system_health` — if the log directory is mounted and accessible
+the tool will confirm it. You can also call `get_proxy_host_logs` with any host ID to
+verify logs are readable.
 
 ## Development
 

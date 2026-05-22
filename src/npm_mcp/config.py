@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     mcp_port: int = 8000
     mcp_transport: str = "stdio"  # "stdio" or "http"
 
+    # Path to NPM log directory (mount NPM's /data/logs here)
+    log_dir: str = ""
+
     # Proxy host creation defaults (JSON string)
     # Example: '{"certificate_id": 24, "ssl_forced": true}'
     proxy_defaults: dict[str, Any] = {}

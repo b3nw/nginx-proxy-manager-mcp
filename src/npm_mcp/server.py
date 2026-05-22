@@ -9,7 +9,8 @@ from mcp.server.fastmcp import FastMCP
 
 from .client import NpmClient
 from .config import settings
-from .exceptions import NpmApiError, NpmAuthenticationError, NpmConnectionError
+from .exceptions import NpmApiError, NpmAuthenticationError, NpmConnectionError, NpmLogError
+from .logs import is_log_dir_configured, list_available_logs, read_log_lines
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,8 @@ def _format_error(e: Exception) -> str:
         return f"Authentication failed: {e}"
     elif isinstance(e, NpmConnectionError):
         return f"Connection error: {e}"
+    elif isinstance(e, NpmLogError):
+        return f"Log error: {e}"
     elif isinstance(e, NpmApiError):
         return f"API error: {e}"
     return f"Error: {e}"
@@ -188,6 +191,14 @@ async def get_system_health() -> str:
                 result.append("Admin access: ❌ (limited permissions)")
         except NpmAuthenticationError:
             result.append("Authenticated: ❌ (check credentials)")
+
+        if is_log_dir_configured():
+            logs = list_available_logs()
+            result.append(f"Log directory: ✅ ({len(logs)} log files found)")
+        else:
+            result.append(
+                "Log directory: ❌ (not configured — set NPM_LOG_DIR to enable get_proxy_host_logs)"
+            )
 
         return "\n".join(result)
 
@@ -443,6 +454,70 @@ async def update_proxy_host(
             f"SSL: {'Enabled' if host.ssl_forced else 'Disabled'}\n"
             f"Certificate ID: {host.certificate_id}"
         )
+
+    except Exception as e:
+        return _format_error(e)
+
+
+@mcp.tool()
+async def get_proxy_host_logs(
+    host_id: int,
+    log_type: str = "access",
+    lines: int = 100,
+    search: str | None = None,
+) -> str:
+    """Retrieve recent nginx log entries for a specific proxy host.
+
+    Reads the raw nginx access or error log file for the given host.
+    Requires the NPM log directory to be mounted (see NPM_LOG_DIR config).
+
+    Args:
+        host_id: The ID of the proxy host (use list_proxy_hosts to find IDs)
+        log_type: Log type - "access" for HTTP traffic or "error"
+            for nginx errors (default: "access")
+        lines: Number of most recent lines to return
+            (default: 100, max: 500)
+        search: Optional filter string - only lines containing this
+            text are returned (case-insensitive)
+
+    Returns:
+        The most recent log lines for the proxy host, with metadata.
+
+    Examples:
+        - get_proxy_host_logs(5) — last 100 access log lines for host 5
+        - get_proxy_host_logs(5, log_type="error") — recent error log
+        - get_proxy_host_logs(5, lines=50, search="404") — last 50 lines containing "404"
+        - get_proxy_host_logs(5, search="10.0.0.1") — filter by client IP
+    """
+    try:
+        client = get_client()
+        host = await client.get_proxy_host(host_id)
+        domains = ", ".join(host.domain_names)
+
+        result = read_log_lines(
+            host_id=host_id,
+            log_type=log_type,
+            lines=lines,
+            search=search,
+        )
+
+        header_parts = [
+            f"Proxy host [{host_id}] {domains} — {log_type} log",
+            f"File: {result['file']}",
+        ]
+        if result["total_lines_in_file"] is not None:
+            header_parts.append(f"Total lines in file: {result['total_lines_in_file']}")
+        if result["matched_lines"] is not None:
+            header_parts.append(f"Lines matching '{search}': {result['matched_lines']}")
+        header_parts.append(f"Showing last {result['returned_lines']} lines:")
+
+        header = "\n".join(header_parts)
+
+        if not result["lines"]:
+            return f"{header}\n\n(no log entries found)"
+
+        log_output = "\n".join(result["lines"])
+        return f"{header}\n\n{log_output}"
 
     except Exception as e:
         return _format_error(e)
