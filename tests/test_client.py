@@ -1,10 +1,9 @@
 """Tests for NpmClient."""
 
 import pytest
-from httpx import Response
 
 from npm_mcp.client import NpmClient
-from npm_mcp.exceptions import NpmAuthenticationError, NpmConnectionError
+from npm_mcp.exceptions import NpmAuthenticationError
 
 
 @pytest.fixture
@@ -227,3 +226,89 @@ class TestNpmClientEndpoints:
             assert host.forward_port == 3000
             assert host.ssl_forced is True
             assert host.certificate_id == 24
+
+    @pytest.mark.asyncio
+    async def test_create_access_list(self, httpx_mock, mock_token_response):
+        """Test creating an access list."""
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/nginx/access-lists",
+            json={
+                "id": 5,
+                "created_on": "2024-01-01T00:00:00Z",
+                "modified_on": "2024-01-01T00:00:00Z",
+                "owner_user_id": 1,
+                "name": "Custom List",
+                "satisfy_any": True,
+                "pass_auth": False,
+            },
+            status_code=201,
+        )
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            al = await client.create_access_list(
+                name="Custom List",
+                satisfy_any=True,
+                pass_auth=False,
+                items=[{"username": "u", "password": "p"}],
+                clients=[{"address": "1.1.1.1", "directive": "allow"}],
+            )
+
+            assert al.id == 5
+            assert al.name == "Custom List"
+            assert al.satisfy_any is True
+            assert al.pass_auth is False
+
+    @pytest.mark.asyncio
+    async def test_get_proxy_host_logs(self, httpx_mock, mock_token_response):
+        """Test fetching proxy host logs via API."""
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+        httpx_mock.add_response(
+            method="GET",
+            url="http://localhost:81/api/nginx/proxy-hosts/42/logs?type=access&limit=50",
+            json={"lines": ["line 1", "line 2"]},
+        )
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            logs = await client.get_proxy_host_logs(host_id=42, log_type="access", lines=50)
+            assert logs == {"lines": ["line 1", "line 2"]}
+
+    @pytest.mark.asyncio
+    async def test_get_proxy_host_logs_summary(self, httpx_mock, mock_token_response):
+        """Test fetching proxy host logs summary via API."""
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+        httpx_mock.add_response(
+            method="GET",
+            url="http://localhost:81/api/nginx/proxy-hosts/42/logs/summary",
+            json={"access": 100, "error": 5},
+        )
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            summary = await client.get_proxy_host_logs_summary(host_id=42)
+            assert summary == {"access": 100, "error": 5}
+

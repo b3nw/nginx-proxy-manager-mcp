@@ -2,6 +2,7 @@
 
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
 
@@ -392,3 +393,61 @@ class NpmClient:
 
         response = await self._request("POST", "/nginx/certificates", json=payload)
         return Certificate(**response.json())
+
+    async def get_proxy_host_logs(
+        self,
+        host_id: int,
+        log_type: str = "access",
+        lines: int = 100,
+    ) -> dict[str, Any]:
+        """Retrieve proxy host logs via the API.
+
+        Args:
+            host_id: NPM proxy host ID.
+            log_type: "access" or "error".
+            lines: Number of most recent lines to return.
+        """
+        response = await self._request(
+            "GET",
+            f"/nginx/proxy-hosts/{host_id}/logs",
+            params={"type": log_type, "limit": lines},
+        )
+        return response.json()
+
+    async def get_proxy_host_logs_summary(self, host_id: int) -> dict[str, Any]:
+        """Retrieve proxy host logs summary via the API.
+
+        Args:
+            host_id: NPM proxy host ID.
+        """
+        response = await self._request("GET", f"/nginx/proxy-hosts/{host_id}/logs/summary")
+        return response.json()
+
+    async def create_access_list(
+        self,
+        name: str,
+        satisfy_any: bool = False,
+        pass_auth: bool = False,
+        items: list[dict[str, Any]] | None = None,
+        clients: list[dict[str, Any]] | None = None,
+    ) -> AccessList:
+        """Create a new access list on the server.
+
+        Args:
+            name: Name of the access list
+            satisfy_any: Satisfy any HTTP auth or IP restriction
+            pass_auth: Pass auth headers to host
+            items: Auth entries (username/password) and IP restrictions
+            clients: IP restriction clients
+        """
+        payload = {
+            "name": name,
+            "satisfy_any": satisfy_any,
+            "pass_auth": pass_auth,
+            "items": items or [],
+            "clients": clients or [],
+        }
+        response = await self._request("POST", "/nginx/access-lists", json=payload)
+        return AccessList(**response.json())
+
+

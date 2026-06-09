@@ -37,6 +37,31 @@ class Settings(BaseSettings):
     identity: str = ""
     secret: str = ""
 
+    # Multi-Server Configuration
+    # Example JSON:
+    # '[{"name": "prod", "url": "http://10.0.0.10:81/api",
+    #    "identity": "admin@example.com", "secret": "pwd"}]'
+    servers: list[dict[str, Any]] = []
+    default_server: str | None = None
+
+    @field_validator("servers", mode="before")
+    @classmethod
+    def parse_servers(cls, v: Any) -> list[dict[str, Any]]:
+        """Parse JSON string to list of dicts, or pass through if already list."""
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str) and v.strip():
+            import json
+            try:
+                data = json.loads(v)
+                if not isinstance(data, list):
+                    raise ValueError("NPM_SERVERS must be a list of objects")
+                return data
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in NPM_SERVERS: {e}") from e
+        return []
+
+
     # MCP Server Configuration
     mcp_host: str = "0.0.0.0"
     mcp_port: int = 8000

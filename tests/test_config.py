@@ -89,3 +89,41 @@ class TestProxyDefaults:
         # Other defaults preserved
         assert defaults["ssl_forced"] is True
         assert defaults["block_exploits"] is True
+
+
+class TestMultiServerConfig:
+    """Test multi-server configuration parsing."""
+
+    def test_servers_empty_by_default(self):
+        """Test that servers is empty by default."""
+        s = Settings(identity="test", secret="test")
+        assert s.servers == []
+        assert s.default_server is None
+
+    def test_servers_json_parsing(self, monkeypatch):
+        """Test parsing servers JSON list from environment variable."""
+        monkeypatch.setenv("NPM_IDENTITY", "test")
+        monkeypatch.setenv("NPM_SECRET", "test")
+        monkeypatch.setenv(
+            "NPM_SERVERS",
+            '[{"name": "prod", "url": "http://prod:81/api", "identity": "p", "secret": "ps"}, '
+            '{"name": "dev", "url": "http://dev:81/api", "identity": "d", "secret": "ds"}]'
+        )
+        monkeypatch.setenv("NPM_DEFAULT_SERVER", "prod")
+
+        s = Settings()
+        assert len(s.servers) == 2
+        assert s.servers[0]["name"] == "prod"
+        assert s.servers[0]["url"] == "http://prod:81/api"
+        assert s.servers[1]["name"] == "dev"
+        assert s.default_server == "prod"
+
+    def test_servers_invalid_json_raises(self, monkeypatch):
+        """Test that invalid servers JSON raises SettingsError."""
+        monkeypatch.setenv("NPM_IDENTITY", "test")
+        monkeypatch.setenv("NPM_SECRET", "test")
+        monkeypatch.setenv("NPM_SERVERS", "{not valid}")
+
+        with pytest.raises(SettingsError):
+            Settings()
+
