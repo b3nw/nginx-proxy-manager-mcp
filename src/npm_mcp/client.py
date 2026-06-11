@@ -386,8 +386,9 @@ class NpmClient:
     async def enable_proxy_host(self, host_id: int) -> bool:
         """Enable (bring online) a proxy host by ID.
 
-        Calls ``POST /nginx/proxy-hosts/{id}/enable``. Enabling a host that
-        is already enabled is a no-op and still returns success.
+        Calls ``POST /nginx/proxy-hosts/{id}/enable``. If the host is already
+        enabled, NPM responds with HTTP 400 ("Host is already enabled"), which
+        raises NpmApiError.
 
         Args:
             host_id: The proxy host ID to enable
@@ -408,8 +409,9 @@ class NpmClient:
 
         Calls ``POST /nginx/proxy-hosts/{id}/disable``. The host's
         configuration is preserved; the reverse proxy simply stops serving
-        its domains until it is re-enabled. Disabling a host that is already
-        disabled is a no-op and still returns success.
+        its domains until it is re-enabled. If the host is already disabled,
+        NPM responds with HTTP 400 ("Host is already disabled"), which raises
+        NpmApiError.
 
         Args:
             host_id: The proxy host ID to disable

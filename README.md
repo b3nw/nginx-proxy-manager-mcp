@@ -159,8 +159,9 @@ delete_proxy_host(42)
 Notes:
 
 - `enable_proxy_host` / `disable_proxy_host` map to NPM's
-  `POST /nginx/proxy-hosts/{id}/enable` and `/disable` endpoints. Toggling a
-  host into the state it is already in is a no-op and still reports success.
+  `POST /nginx/proxy-hosts/{id}/enable` and `/disable` endpoints. If the host
+  is already in the requested state, NPM returns an HTTP 400 error
+  (e.g. `Host is already enabled`), which the tool surfaces as an API error.
 - `delete_proxy_host` maps to `DELETE /nginx/proxy-hosts/{id}` and is
   destructive — the reverse proxy stops serving the host's domains
   immediately. Recreate it with `create_proxy_host` if you need it back.

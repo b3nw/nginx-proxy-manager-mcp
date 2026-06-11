@@ -504,8 +504,8 @@ async def enable_proxy_host(host_id: int) -> str:
 
     Brings a previously disabled proxy host back online via
     POST /nginx/proxy-hosts/{id}/enable, so the reverse proxy serves its
-    domains again. Enabling an already-enabled host is a no-op and still
-    returns success.
+    domains again. If the host is already enabled, NPM returns an HTTP 400
+    error ("Host is already enabled"), which is surfaced as an API error.
 
     Args:
         host_id: The ID of the proxy host to enable (use list_proxy_hosts to find IDs)
@@ -538,8 +538,8 @@ async def disable_proxy_host(host_id: int) -> str:
     Takes a proxy host offline via POST /nginx/proxy-hosts/{id}/disable
     without deleting it. The reverse proxy stops serving the host's domains
     until it is re-enabled with enable_proxy_host; the configuration is
-    preserved. Disabling an already-disabled host is a no-op and still
-    returns success.
+    preserved. If the host is already disabled, NPM returns an HTTP 400
+    error ("Host is already disabled"), which is surfaced as an API error.
 
     Args:
         host_id: The ID of the proxy host to disable (use list_proxy_hosts to find IDs)
