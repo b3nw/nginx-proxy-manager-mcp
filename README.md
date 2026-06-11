@@ -134,7 +134,36 @@ Add to your `claude_desktop_config.json`:
 | `list_access_lists` | List access lists for authentication/IP restrictions |
 | `create_proxy_host` | Create a new proxy host |
 | `update_proxy_host` | Update an existing proxy host (v0.0.3+) |
+| `delete_proxy_host` | Delete a proxy host permanently |
+| `enable_proxy_host` | Enable (bring online) a disabled proxy host |
+| `disable_proxy_host` | Disable (take offline) a proxy host without deleting it |
 | `create_certificate` | Provision a new Let's Encrypt SSL certificate (v0.0.3+) |
+
+## Managing Proxy Host Lifecycle
+
+Beyond creating and updating hosts, the server can delete a host outright or
+toggle a host on and off without losing its configuration. Find the host ID
+with `list_proxy_hosts` first.
+
+```text
+# Take a host offline temporarily (config is preserved)
+disable_proxy_host(42)
+
+# Bring it back online
+enable_proxy_host(42)
+
+# Permanently remove a host (cannot be undone)
+delete_proxy_host(42)
+```
+
+Notes:
+
+- `enable_proxy_host` / `disable_proxy_host` map to NPM's
+  `POST /nginx/proxy-hosts/{id}/enable` and `/disable` endpoints. Toggling a
+  host into the state it is already in is a no-op and still reports success.
+- `delete_proxy_host` maps to `DELETE /nginx/proxy-hosts/{id}` and is
+  destructive — the reverse proxy stops serving the host's domains
+  immediately. Recreate it with `create_proxy_host` if you need it back.
 
 ## Log Access Setup
 
