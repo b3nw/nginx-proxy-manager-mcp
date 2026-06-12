@@ -374,7 +374,8 @@ class NpmClient:
 
         Args:
             domain_names: List of domain names for the certificate
-            email: Email address for Let's Encrypt notifications
+            email: Ignored in NPM 2.14+ (email is configured in NPM settings).
+                   Kept for backward compatibility with the MCP tool interface.
             provider: Certificate provider (default: "letsencrypt")
             dns_challenge: Use DNS challenge instead of HTTP (default: False)
 
@@ -385,16 +386,30 @@ class NpmClient:
         # NPM 2.14 uses additionalProperties: false on meta, only these fields are allowed:
         # certificate, certificate_key, dns_challenge, dns_provider_credentials,
         # dns_provider, letsencrypt_certificate, propagation_seconds, key_type
-        meta: dict[str, Any] = {}
+        meta: dict = {}
         if dns_challenge:
             meta["dns_challenge"] = True
             dns_provider = os.environ.get("DNS_PROVIDER", "cloudflare")
             meta["dns_provider"] = dns_provider
-            dns_token = os.environ.get("DNS_CLOUDFLARE_API_TOKEN", "")
-            if dns_token:
-                meta["dns_provider_credentials"] = (
-                    f"dns_cloudflare_api_token={dns_token}\n"
-                )
+            dns_creds = os.environ.get("DNS_PROVIDER_CREDENTIALS", "")
+            if not dns_creds:
+                # Fallback: build credentials from provider-specific env vars
+                if dns_provider == "cloudflare":
+                    dns_token = os.environ.get("DNS_CLOUDFLARE_API_TOKEN", "")
+                    if dns_token:
+                        dns_creds = f"dns_cloudflare_api_token={dns_token}\n"
+                elif dns_provider == "route53":
+                    # AWS Route53 uses IAM roles or access keys
+                    aws_access_key = os.environ.get("AWS_ACCESS_KEY_ID", "")
+                    aws_secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+                    if aws_access_key and aws_secret_key:
+                        dns_creds = (
+                            f"aws_access_key_id={aws_access_key}\n"
+                            f"aws_secret_access_key={aws_secret_key}\n"
+                        )
+                # Add more providers as needed
+            if dns_creds:
+                meta["dns_provider_credentials"] = dns_creds
         payload = {
             "domain_names": domain_names,
             "nice_name": domain_names[0] if domain_names else "certificate",
