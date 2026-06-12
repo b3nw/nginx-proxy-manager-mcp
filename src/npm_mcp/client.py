@@ -1,6 +1,7 @@
 """Async HTTP client for Nginx Proxy Manager API."""
 
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -380,13 +381,24 @@ class NpmClient:
         Returns:
             Created Certificate object
         """
+        # Build meta according to NPM 2.14+ API schema
+        # NPM 2.14 uses additionalProperties: false on meta, only these fields are allowed:
+        # certificate, certificate_key, dns_challenge, dns_provider_credentials,
+        # dns_provider, letsencrypt_certificate, propagation_seconds, key_type
+        meta: dict[str, Any] = {}
+        if dns_challenge:
+            meta["dns_challenge"] = True
+            dns_provider = os.environ.get("DNS_PROVIDER", "cloudflare")
+            meta["dns_provider"] = dns_provider
+            dns_token = os.environ.get("DNS_CLOUDFLARE_API_TOKEN", "")
+            if dns_token:
+                meta["dns_provider_credentials"] = (
+                    f"dns_cloudflare_api_token={dns_token}\n"
+                )
         payload = {
             "domain_names": domain_names,
-            "meta": {
-                "letsencrypt_email": email,
-                "letsencrypt_agree": True,
-                "dns_challenge": dns_challenge,
-            },
+            "nice_name": domain_names[0] if domain_names else "certificate",
+            "meta": meta,
             "provider": provider,
         }
 
