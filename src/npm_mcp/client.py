@@ -362,6 +362,71 @@ class NpmClient:
         response = await self._request("PUT", f"/nginx/proxy-hosts/{host_id}", json=payload)
         return ProxyHost(**response.json())
 
+    async def delete_proxy_host(self, host_id: int) -> bool:
+        """Delete a proxy host by ID.
+
+        Calls ``DELETE /nginx/proxy-hosts/{id}``. The reverse proxy stops
+        serving the host's domains immediately and the configuration is
+        removed. This is destructive and cannot be undone.
+
+        Args:
+            host_id: The proxy host ID to delete
+
+        Returns:
+            True if NPM reported the host was deleted
+
+        Raises:
+            NpmNotFoundError: If the proxy host does not exist
+            NpmApiError: For other API errors
+        """
+        response = await self._request("DELETE", f"/nginx/proxy-hosts/{host_id}")
+        # NPM returns the JSON literal `true` on a successful delete.
+        return bool(response.json())
+
+    async def enable_proxy_host(self, host_id: int) -> bool:
+        """Enable (bring online) a proxy host by ID.
+
+        Calls ``POST /nginx/proxy-hosts/{id}/enable``. If the host is already
+        enabled, NPM responds with HTTP 400 ("Host is already enabled"), which
+        raises NpmApiError.
+
+        Args:
+            host_id: The proxy host ID to enable
+
+        Returns:
+            True if NPM reported the host was enabled
+
+        Raises:
+            NpmNotFoundError: If the proxy host does not exist
+            NpmApiError: For other API errors
+        """
+        response = await self._request("POST", f"/nginx/proxy-hosts/{host_id}/enable")
+        # NPM returns the JSON literal `true` on success.
+        return bool(response.json())
+
+    async def disable_proxy_host(self, host_id: int) -> bool:
+        """Disable (take offline) a proxy host by ID.
+
+        Calls ``POST /nginx/proxy-hosts/{id}/disable``. The host's
+        configuration is preserved; the reverse proxy simply stops serving
+        its domains until it is re-enabled. If the host is already disabled,
+        NPM responds with HTTP 400 ("Host is already disabled"), which raises
+        NpmApiError.
+
+        Args:
+            host_id: The proxy host ID to disable
+
+        Returns:
+            True if NPM reported the host was disabled
+
+        Raises:
+            NpmNotFoundError: If the proxy host does not exist
+            NpmApiError: For other API errors
+        """
+        response = await self._request("POST", f"/nginx/proxy-hosts/{host_id}/disable")
+        # NPM returns the JSON literal `true` on success.
+        return bool(response.json())
+
     async def create_certificate(
         self,
         domain_names: list[str],

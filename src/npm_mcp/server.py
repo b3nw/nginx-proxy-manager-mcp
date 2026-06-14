@@ -86,7 +86,7 @@ async def list_proxy_hosts() -> str:
         result = []
         for host in hosts:
             domains = ", ".join(host.domain_names)
-            ssl_status = "🔒 SSL" if host.ssl_forced else "🔓 HTTP"
+            ssl_status = "\U0001f512 SSL" if host.ssl_forced else "\U0001f513 HTTP"
             enabled_status = "✅" if host.enabled else "❌"
 
             result.append(
@@ -313,8 +313,8 @@ async def create_proxy_host(
     """Create a new proxy host in Nginx Proxy Manager.
 
     Args:
-        domain_names: List of domain names (e.g., ["app.ext.ben.io"])
-        forward_host: Backend host/IP to forward to (e.g., "192.168.1.100" or "container-name")
+        domain_names: List of domain names (e.g., ["app.example.com"])
+        forward_host: Backend host/IP to forward to (e.g., "10.0.0.50" or "container-name")
         forward_port: Backend port to forward to (e.g., 8080)
         forward_scheme: Backend protocol - "http" or "https" (default from config)
         certificate_id: SSL certificate ID. Use list_certificates to find available certs.
@@ -335,10 +335,10 @@ async def create_proxy_host(
 
     Example:
         create_proxy_host(
-            domain_names=["myapp.ext.ben.io"],
+            domain_names=["myapp.example.com"],
             forward_host="10.0.0.50",
             forward_port=3000,
-            certificate_id=24,  # *.ext.ben.io wildcard
+            certificate_id=24,  # *.example.com wildcard
         )
     """
     try:
@@ -454,6 +454,118 @@ async def update_proxy_host(
             f"SSL: {'Enabled' if host.ssl_forced else 'Disabled'}\n"
             f"Certificate ID: {host.certificate_id}"
         )
+
+    except Exception as e:
+        return _format_error(e)
+
+
+@mcp.tool()
+async def delete_proxy_host(host_id: int) -> str:
+    """Delete a proxy host from Nginx Proxy Manager.
+
+    Permanently removes the proxy host configuration via
+    DELETE /nginx/proxy-hosts/{id}. The reverse proxy stops serving the
+    host's domains immediately. This action cannot be undone — recreate the
+    host with create_proxy_host if you need it back.
+
+    Args:
+        host_id: The ID of the proxy host to delete (use list_proxy_hosts to find IDs)
+
+    Returns:
+        Confirmation that the proxy host was deleted.
+
+    Example:
+        delete_proxy_host(42)  # permanently remove proxy host 42
+    """
+    try:
+        client = get_client()
+
+        # Resolve the domains first so the confirmation message is meaningful.
+        domains: str | None = None
+        try:
+            host = await client.get_proxy_host(host_id)
+            domains = ", ".join(host.domain_names)
+        except Exception:
+            domains = None
+
+        await client.delete_proxy_host(host_id)
+
+        if domains:
+            return f"Successfully deleted proxy host [{host_id}] ({domains})."
+        return f"Successfully deleted proxy host [{host_id}]."
+
+    except Exception as e:
+        return _format_error(e)
+
+
+@mcp.tool()
+async def enable_proxy_host(host_id: int) -> str:
+    """Enable a proxy host in Nginx Proxy Manager.
+
+    Brings a previously disabled proxy host back online via
+    POST /nginx/proxy-hosts/{id}/enable, so the reverse proxy serves its
+    domains again. If the host is already enabled, NPM returns an HTTP 400
+    error ("Host is already enabled"), which is surfaced as an API error.
+
+    Args:
+        host_id: The ID of the proxy host to enable (use list_proxy_hosts to find IDs)
+
+    Returns:
+        Confirmation that the proxy host was enabled.
+
+    Example:
+        enable_proxy_host(42)  # bring proxy host 42 back online
+    """
+    try:
+        client = get_client()
+        await client.enable_proxy_host(host_id)
+
+        try:
+            host = await client.get_proxy_host(host_id)
+            domains = ", ".join(host.domain_names)
+            return f"Successfully enabled proxy host [{host_id}] ({domains})."
+        except Exception:
+            return f"Successfully enabled proxy host [{host_id}]."
+
+    except Exception as e:
+        return _format_error(e)
+
+
+@mcp.tool()
+async def disable_proxy_host(host_id: int) -> str:
+    """Disable a proxy host in Nginx Proxy Manager.
+
+    Takes a proxy host offline via POST /nginx/proxy-hosts/{id}/disable
+    without deleting it. The reverse proxy stops serving the host's domains
+    until it is re-enabled with enable_proxy_host; the configuration is
+    preserved. If the host is already disabled, NPM returns an HTTP 400
+    error ("Host is already disabled"), which is surfaced as an API error.
+
+    Args:
+        host_id: The ID of the proxy host to disable (use list_proxy_hosts to find IDs)
+
+    Returns:
+        Confirmation that the proxy host was disabled.
+
+    Example:
+        disable_proxy_host(42)  # take proxy host 42 offline, keep its config
+    """
+    try:
+        client = get_client()
+
+        # Resolve domains before disabling (host stays readable while disabled).
+        domains: str | None = None
+        try:
+            host = await client.get_proxy_host(host_id)
+            domains = ", ".join(host.domain_names)
+        except Exception:
+            domains = None
+
+        await client.disable_proxy_host(host_id)
+
+        if domains:
+            return f"Successfully disabled proxy host [{host_id}] ({domains})."
+        return f"Successfully disabled proxy host [{host_id}]."
 
     except Exception as e:
         return _format_error(e)
