@@ -134,9 +134,9 @@ Add to your `claude_desktop_config.json`:
 | `list_access_lists` | List access lists for authentication/IP restrictions |
 | `create_proxy_host` | Create a new proxy host |
 | `update_proxy_host` | Update an existing proxy host (v0.0.3+) |
-| `delete_proxy_host` | Delete a proxy host permanently |
-| `enable_proxy_host` | Enable (bring online) a disabled proxy host |
-| `disable_proxy_host` | Disable (take offline) a proxy host without deleting it |
+| `delete_proxy_host` | Delete a proxy host permanently (v0.0.4+) |
+| `enable_proxy_host` | Enable (bring online) a disabled proxy host (v0.0.4+) |
+| `disable_proxy_host` | Disable (take offline) a proxy host without deleting it (v0.0.4+) |
 | `create_certificate` | Provision a new Let's Encrypt SSL certificate (v0.0.3+) |
 
 ## Managing Proxy Host Lifecycle
