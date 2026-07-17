@@ -4,7 +4,7 @@ import pytest
 from httpx import Response
 
 from npm_mcp.client import NpmClient
-from npm_mcp.exceptions import NpmAuthenticationError, NpmConnectionError
+from npm_mcp.exceptions import NpmApiError, NpmAuthenticationError, NpmConnectionError
 
 
 @pytest.fixture
@@ -227,3 +227,29 @@ class TestNpmClientEndpoints:
             assert host.forward_port == 3000
             assert host.ssl_forced is True
             assert host.certificate_id == 24
+
+    @pytest.mark.asyncio
+    async def test_api_error_no_double_prefix(self, httpx_mock, mock_token_response):
+        """Test that API errors don't have a duplicated 'API error:' prefix."""
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+        httpx_mock.add_response(
+            method="GET",
+            url="http://localhost:81/api/nginx/proxy-hosts?expand=owner%2Ccertificate",
+            json={"error": {"message": "Something went wrong"}},
+            status_code=400,
+        )
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            with pytest.raises(NpmApiError) as exc_info:
+                await client.get_proxy_hosts()
+
+            msg = str(exc_info.value)
+            assert msg.count("API error") == 0, f"Client should not prefix error: {msg}"

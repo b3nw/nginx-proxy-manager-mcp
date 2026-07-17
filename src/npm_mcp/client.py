@@ -171,7 +171,7 @@ class NpmClient:
             raise NpmNotFoundError(f"Resource not found: {endpoint}")
 
         if response.status_code >= 400:
-            raise NpmApiError(f"API error: {response.text}", status_code=response.status_code)
+            raise NpmApiError(response.text, status_code=response.status_code)
 
         return response
 
