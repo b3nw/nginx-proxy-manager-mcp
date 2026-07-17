@@ -16,6 +16,8 @@ services:
       - NPM_MCP_TRANSPORT=http
       - NPM_MCP_HOST=0.0.0.0
       - NPM_MCP_PORT=8000
+      # Optional: Enable write/destructive operations (default: disabled)
+      # - NPM_MCP_ENABLE_DESTRUCTIVE_TOOLS=true
       # Optional: Log access (requires volume mount below)
       # - NPM_LOG_DIR=/data/npm-logs
     # volumes:

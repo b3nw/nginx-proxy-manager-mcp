@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     mcp_port: int = 8000
     mcp_transport: str = "stdio"  # "stdio" or "http"
 
+    # Runtime guard for destructive/write operations
+    mcp_enable_destructive_tools: bool = False
+
     # Path to NPM log directory (mount NPM's /data/logs here)
     log_dir: str = ""
 

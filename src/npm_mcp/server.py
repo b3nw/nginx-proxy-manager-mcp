@@ -51,6 +51,19 @@ mcp = FastMCP(
 )
 
 
+DESTRUCTIVE_DISABLED_MSG = (
+    "Destructive operations are disabled. "
+    "Set NPM_MCP_ENABLE_DESTRUCTIVE_TOOLS=true to enable."
+)
+
+
+def _check_destructive() -> str | None:
+    """Return error message if destructive tools are disabled, else None."""
+    if not settings.mcp_enable_destructive_tools:
+        return DESTRUCTIVE_DISABLED_MSG
+    return None
+
+
 def _format_error(e: Exception) -> str:
     """Format exception for tool response."""
     if isinstance(e, NpmAuthenticationError):
@@ -341,6 +354,8 @@ async def create_proxy_host(
             certificate_id=24,  # *.example.com wildcard
         )
     """
+    if msg := _check_destructive():
+        return msg
     try:
         # Get defaults from config, then override with provided values
         defaults = settings.get_proxy_defaults()
@@ -421,6 +436,8 @@ async def update_proxy_host(
     Returns:
         Details of the updated proxy host.
     """
+    if msg := _check_destructive():
+        return msg
     try:
         client = get_client()
         kwargs = {}
@@ -477,6 +494,8 @@ async def delete_proxy_host(host_id: int) -> str:
     Example:
         delete_proxy_host(42)  # permanently remove proxy host 42
     """
+    if msg := _check_destructive():
+        return msg
     try:
         client = get_client()
 
@@ -516,6 +535,8 @@ async def enable_proxy_host(host_id: int) -> str:
     Example:
         enable_proxy_host(42)  # bring proxy host 42 back online
     """
+    if msg := _check_destructive():
+        return msg
     try:
         client = get_client()
         await client.enable_proxy_host(host_id)
@@ -550,6 +571,8 @@ async def disable_proxy_host(host_id: int) -> str:
     Example:
         disable_proxy_host(42)  # take proxy host 42 offline, keep its config
     """
+    if msg := _check_destructive():
+        return msg
     try:
         client = get_client()
 
@@ -652,6 +675,8 @@ async def create_certificate(
         Details of the created certificate including its ID.
         Use the returned ID with create_proxy_host or update_proxy_host.
     """
+    if msg := _check_destructive():
+        return msg
     try:
         client = get_client()
         cert = await client.create_certificate(

@@ -89,3 +89,22 @@ class TestProxyDefaults:
         # Other defaults preserved
         assert defaults["ssl_forced"] is True
         assert defaults["block_exploits"] is True
+
+
+class TestDestructiveToolsGuard:
+    """Test NPM_MCP_ENABLE_DESTRUCTIVE_TOOLS setting."""
+
+    def test_destructive_tools_default_disabled(self):
+        settings = Settings(identity="test", secret="test")
+        assert settings.mcp_enable_destructive_tools is False
+
+    def test_destructive_tools_enabled(self):
+        settings = Settings(identity="test", secret="test", mcp_enable_destructive_tools=True)
+        assert settings.mcp_enable_destructive_tools is True
+
+    def test_destructive_tools_env_var(self, monkeypatch):
+        monkeypatch.setenv("NPM_IDENTITY", "test")
+        monkeypatch.setenv("NPM_SECRET", "test")
+        monkeypatch.setenv("NPM_MCP_ENABLE_DESTRUCTIVE_TOOLS", "true")
+        settings = Settings()
+        assert settings.mcp_enable_destructive_tools is True
