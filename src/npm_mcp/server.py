@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from .client import NpmClient
 from .config import NpmInstance, settings
@@ -57,8 +57,6 @@ mcp = FastMCP(
     "npm-mcp",
     instructions="MCP server for Nginx Proxy Manager - manage reverse proxy configurations",
     lifespan=lifespan,
-    host=settings.mcp_host,
-    port=settings.mcp_port,
 )
 
 
