@@ -105,3 +105,28 @@ class TestMultiInstance:
                 identity="i", secret="s",
                 instances={"site1": {"api_url": "http://npm:81/api", "identity": "a", "secret": "b", "proxy_defaults": "invalid"}}
             )
+
+    def test_default_instance_selection(self):
+        # Explicit default instance configuration
+        s = Settings(
+            identity="i", secret="s",
+            default_instance="beta",
+            instances={
+                "alpha": {"api_url": "http://a:81/api", "identity": "x", "secret": "y"},
+                "beta": {"api_url": "http://b:81/api", "identity": "x", "secret": "y"},
+            },
+        )
+        assert s.default_instance_name == "beta"
+        assert s.get_instance().name == "beta"
+
+    def test_default_instance_missing_raises(self):
+        # Explicit default instance configured but not present in instances list
+        with pytest.raises(ValueError, match="is not in configured instances"):
+            Settings(
+                identity="i", secret="s",
+                default_instance="gamma",
+                instances={
+                    "alpha": {"api_url": "http://a:81/api", "identity": "x", "secret": "y"},
+                    "beta": {"api_url": "http://b:81/api", "identity": "x", "secret": "y"},
+                },
+            )

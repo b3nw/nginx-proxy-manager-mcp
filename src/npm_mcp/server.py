@@ -227,7 +227,7 @@ async def get_system_health(instance: str | None = None) -> str:
         except NpmAuthenticationError:
             result.append("Authenticated: \u274c (check credentials)")
 
-        log_dir = inst.log_dir or settings.log_dir
+        log_dir = inst.log_dir
         if log_dir and is_log_dir_configured(log_dir):
             logs = list_available_logs(log_dir)
             result.append(f"Log directory: \u2705 ({len(logs)} log files found)")
@@ -575,7 +575,7 @@ async def get_proxy_host_logs(
         host = await client.get_proxy_host(host_id)
         domains = ", ".join(host.domain_names)
 
-        log_dir = inst.log_dir or settings.log_dir
+        log_dir = inst.log_dir
         if not log_dir:
             return (
                 "Log directory not configured for this instance. "

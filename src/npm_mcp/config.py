@@ -75,8 +75,9 @@ class Settings(BaseSettings):
     log_dir: str = ""
     proxy_defaults: dict[str, Any] = {}
     instances: dict[str, dict[str, Any]] = {}
+    default_instance: str | None = None
 
-    # ponytail: runtime cache, not pydantic fields
+    # Private attrs — runtime cache, not pydantic fields
     _instances_parsed: dict[str, NpmInstance] = {}
     _default_instance_name: str = ""
 
@@ -149,7 +150,16 @@ class Settings(BaseSettings):
                     log_dir=log_dir,
                     proxy_defaults=proxy_defaults,
                 )
-            self._default_instance_name = next(iter(parsed))
+            if self.default_instance:
+                if self.default_instance not in parsed:
+                    available = ", ".join(parsed)
+                    raise ValueError(
+                        f"NPM_DEFAULT_INSTANCE '{self.default_instance}' is not in configured instances. "
+                        f"Available: {available}"
+                    )
+                self._default_instance_name = self.default_instance
+            else:
+                self._default_instance_name = next(iter(parsed))
         elif self.identity and self.secret:
             parsed["default"] = NpmInstance(
                 name="default",
