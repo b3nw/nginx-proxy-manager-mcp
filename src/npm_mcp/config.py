@@ -122,13 +122,32 @@ class Settings(BaseSettings):
                         f"NPM_INSTANCES['{name}'] missing required field(s): "
                         f"{missing}"
                     )
+                for field in ("api_url", "identity", "secret"):
+                    val = cfg[field]
+                    if not isinstance(val, str):
+                        raise ValueError(
+                            f"NPM_INSTANCES['{name}']['{field}'] must be a string, "
+                            f"got {type(val).__name__}"
+                        )
+                log_dir = cfg.get("log_dir", "")
+                if not isinstance(log_dir, str):
+                    raise ValueError(
+                        f"NPM_INSTANCES['{name}']['log_dir'] must be a string, "
+                        f"got {type(log_dir).__name__}"
+                    )
+                proxy_defaults = cfg.get("proxy_defaults", {})
+                if not isinstance(proxy_defaults, dict):
+                    raise ValueError(
+                        f"NPM_INSTANCES['{name}']['proxy_defaults'] must be an object, "
+                        f"got {type(proxy_defaults).__name__}"
+                    )
                 parsed[name] = NpmInstance(
                     name=name,
                     api_url=cfg["api_url"],
                     identity=cfg["identity"],
                     secret=cfg["secret"],
-                    log_dir=cfg.get("log_dir", ""),
-                    proxy_defaults=cfg.get("proxy_defaults", {}),
+                    log_dir=log_dir,
+                    proxy_defaults=proxy_defaults,
                 )
             self._default_instance_name = next(iter(parsed))
         elif self.identity and self.secret:

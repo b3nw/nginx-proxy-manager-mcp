@@ -83,3 +83,25 @@ class TestMultiInstance:
     def test_default_instance_name_property(self):
         s = Settings(identity="a", secret="b")
         assert s.default_instance_name == "default"
+
+    def test_instances_invalid_types_raise(self):
+        # Invalid api_url type (int)
+        with pytest.raises(ValueError, match="must be a string"):
+            Settings(
+                identity="i", secret="s",
+                instances={"site1": {"api_url": 123, "identity": "a", "secret": "b"}}
+            )
+
+        # Invalid log_dir type (list)
+        with pytest.raises(ValueError, match="must be a string"):
+            Settings(
+                identity="i", secret="s",
+                instances={"site1": {"api_url": "http://npm:81/api", "identity": "a", "secret": "b", "log_dir": []}}
+            )
+
+        # Invalid proxy_defaults type (str)
+        with pytest.raises(ValueError, match="must be an object"):
+            Settings(
+                identity="i", secret="s",
+                instances={"site1": {"api_url": "http://npm:81/api", "identity": "a", "secret": "b", "proxy_defaults": "invalid"}}
+            )
