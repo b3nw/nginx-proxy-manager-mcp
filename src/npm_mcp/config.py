@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # Runtime guard for destructive/write operations
     mcp_enable_destructive_tools: bool = False
 
+    # Optional bearer token for authenticating MCP clients over HTTP
+    mcp_auth_token: str = ""
+
     # Path to NPM log directory (mount NPM's /data/logs here)
     log_dir: str = ""
 

@@ -65,6 +65,7 @@ NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true}'
 | `NPM_MCP_PORT` | No | `8000` | MCP server port |
 | `NPM_MCP_TRANSPORT` | No | `stdio` | Transport mode (`stdio` or `http`) |
 | `NPM_MCP_ENABLE_DESTRUCTIVE_TOOLS` | No | `false` | Enable write/destructive tools (create, update, delete, enable, disable) |
+| `NPM_MCP_AUTH_TOKEN` | No | - | Bearer token required for HTTP transport clients |
 | `NPM_LOG_DIR` | No | - | Path to mounted NPM log directory (enables `get_proxy_host_logs`) |
 | `NPM_PROXY_DEFAULTS` | No | `{}` | JSON defaults for `create_proxy_host` |
 

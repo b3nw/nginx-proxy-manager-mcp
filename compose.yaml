@@ -18,6 +18,8 @@ services:
       - NPM_MCP_PORT=8000
       # Optional: Enable write/destructive operations (default: disabled)
       # - NPM_MCP_ENABLE_DESTRUCTIVE_TOOLS=true
+      # Optional: Require bearer token for MCP HTTP clients
+      # - NPM_MCP_AUTH_TOKEN=your-secret-token-here
       # Optional: Log access (requires volume mount below)
       # - NPM_LOG_DIR=/data/npm-logs
     # volumes:
