@@ -50,9 +50,9 @@ def main() -> None:
     else:
         logger.info(f"Starting MCP server in HTTP mode on {args.host}:{args.port}")
 
-        # Always construct the HTTP app using the same FastMCP.streamable_http_app()
+        # Always construct the HTTP app using the same FastMCP.http_app()
         # so that its lifespan (StreamableHTTPSessionManager background task) runs correctly.
-        app = mcp.streamable_http_app()
+        app = mcp.http_app()
 
         # Mount /health directly on the inner router
         from starlette.responses import PlainTextResponse
