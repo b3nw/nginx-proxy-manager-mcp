@@ -104,7 +104,7 @@ class TestReadLogLines:
             read_log_lines(host_id=5, log_type="combined")
 
     def test_no_log_dir_configured(self, no_log_dir):
-        with pytest.raises(NpmLogError, match="NPM_LOG_DIR is not configured"):
+        with pytest.raises(NpmLogError, match="not configured"):
             read_log_lines(host_id=5, log_type="access")
 
     def test_nonexistent_log_dir(self, monkeypatch):
@@ -142,5 +142,5 @@ class TestListAvailableLogs:
         assert access_5["size_bytes"] > 0
 
     def test_not_configured(self, no_log_dir):
-        with pytest.raises(NpmLogError, match="NPM_LOG_DIR is not configured"):
+        with pytest.raises(NpmLogError, match="not configured"):
             list_available_logs()

@@ -68,6 +68,7 @@ NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true}'
 | `NPM_MCP_AUTH_TOKEN` | No | - | Bearer token required for HTTP transport clients |
 | `NPM_LOG_DIR` | No | - | Path to mounted NPM log directory (enables `get_proxy_host_logs`) |
 | `NPM_PROXY_DEFAULTS` | No | `{}` | JSON defaults for `create_proxy_host` |
+| `NPM_INSTANCES` | No | - | JSON map of named NPM instances for multi-instance mode (see below) |
 
 ### NPM_PROXY_DEFAULTS Keys
 
@@ -86,6 +87,20 @@ NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true, "block_exploits":
 | `allow_websocket_upgrade` | bool | `true` | Allow WebSocket connections |
 | `access_list_id` | int | `0` | Access list ID (use `list_access_lists` to find) |
 | `advanced_config` | string | `""` | Custom nginx configuration block |
+
+### Multi-Instance Mode
+
+Manage multiple NPM servers from a single MCP instance by setting `NPM_INSTANCES`:
+
+```bash
+NPM_INSTANCES='{"prod":{"api_url":"http://npm-prod:81/api","identity":"admin@prod.com","secret":"x","log_dir":"/data/prod-logs"},"staging":{"api_url":"http://npm-staging:81/api","identity":"admin@staging.com","secret":"y"}}'
+```
+
+Each instance object supports: `api_url` (required), `identity` (required), `secret` (required), `log_dir` (optional), `proxy_defaults` (optional).
+
+When `NPM_INSTANCES` is set, single-instance settings (`NPM_API_URL`, `NPM_IDENTITY`, `NPM_SECRET`) are ignored. Every tool gains an optional `instance` parameter - omit it to target the first configured instance.
+
+Use the `list_instances` tool to see all available instances.
 
 ## Usage
 
