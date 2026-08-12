@@ -38,9 +38,10 @@ class TestBearerAuth:
         assert r.status_code == 401
         assert r.headers["WWW-Authenticate"] == "Bearer"
 
-    def test_wrong_token_returns_403(self, client):
+    def test_wrong_token_returns_401(self, client):
         r = client.get("/mcp", headers={"Authorization": "Bearer wrong"})
-        assert r.status_code == 403
+        assert r.status_code == 401
+        assert r.headers["WWW-Authenticate"] == 'Bearer error="invalid_token"'
 
     def test_valid_token_passes(self, client):
         r = client.get("/mcp", headers={"Authorization": f"Bearer {TOKEN}"})
