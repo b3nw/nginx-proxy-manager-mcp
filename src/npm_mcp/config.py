@@ -154,8 +154,8 @@ class Settings(BaseSettings):
                 if self.default_instance not in parsed:
                     available = ", ".join(parsed)
                     raise ValueError(
-                        f"NPM_DEFAULT_INSTANCE '{self.default_instance}' is not in configured instances. "
-                        f"Available: {available}"
+                        f"NPM_DEFAULT_INSTANCE '{self.default_instance}' "
+                        f"is not in configured instances. Available: {available}"
                     )
                 self._default_instance_name = self.default_instance
             else:
