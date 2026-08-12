@@ -69,6 +69,7 @@ NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true}'
 | `NPM_LOG_DIR` | No | - | Path to mounted NPM log directory (enables `get_proxy_host_logs`) |
 | `NPM_PROXY_DEFAULTS` | No | `{}` | JSON defaults for `create_proxy_host` |
 | `NPM_INSTANCES` | No | - | JSON map of named NPM instances for multi-instance mode (see below) |
+| `NPM_DEFAULT_INSTANCE` | No | - | Name of the default instance for unnamed tool calls (defaults to the first instance in `NPM_INSTANCES`) |
 
 ### NPM_PROXY_DEFAULTS Keys
 
@@ -98,7 +99,7 @@ NPM_INSTANCES='{"prod":{"api_url":"http://npm-prod:81/api","identity":"admin@pro
 
 Each instance object supports: `api_url` (required), `identity` (required), `secret` (required), `log_dir` (optional), `proxy_defaults` (optional).
 
-When `NPM_INSTANCES` is set, single-instance settings (`NPM_API_URL`, `NPM_IDENTITY`, `NPM_SECRET`) are ignored. Every tool gains an optional `instance` parameter - omit it to target the first configured instance.
+When `NPM_INSTANCES` is set, single-instance settings (`NPM_API_URL`, `NPM_IDENTITY`, `NPM_SECRET`) are ignored. Every tool gains an optional `instance` parameter - omit it to target the explicit `NPM_DEFAULT_INSTANCE` (or the first configured instance in `NPM_INSTANCES` if unset).
 
 Use the `list_instances` tool to see all available instances.
 

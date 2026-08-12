@@ -16,7 +16,8 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB safety cap
 
 def _get_log_dir(log_dir: str | None = None) -> Path:
     """Resolve and validate the configured log directory."""
-    d = log_dir or settings.log_dir
+    # Prevent falling back to global settings.log_dir when multi-instance mode is active.
+    d = log_dir if settings.instances else (log_dir or settings.log_dir)
     if not d:
         raise NpmLogError(
             "Log directory is not configured. Mount NPM's /data/logs volume "
@@ -90,7 +91,8 @@ def read_log_lines(
 
 def is_log_dir_configured(log_dir: str | None = None) -> bool:
     """Check whether the log directory is configured and accessible."""
-    d = log_dir or settings.log_dir
+    # Prevent falling back to global settings.log_dir when multi-instance mode is active.
+    d = log_dir if settings.instances else (log_dir or settings.log_dir)
     if not d:
         return False
     return Path(d).is_dir()
