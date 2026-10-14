@@ -16,7 +16,8 @@ class TestMultiInstance:
 
     def test_multi_instance_from_dict(self):
         s = Settings(
-            identity="ignored", secret="ignored",
+            identity="ignored",
+            secret="ignored",
             instances={
                 "prod": {"api_url": "http://prod:81/api", "identity": "a@b", "secret": "p"},
                 "staging": {"api_url": "http://staging:81/api", "identity": "c@d", "secret": "s"},
@@ -28,7 +29,8 @@ class TestMultiInstance:
 
     def test_default_instance_is_first(self):
         s = Settings(
-            identity="i", secret="s",
+            identity="i",
+            secret="s",
             instances={
                 "alpha": {"api_url": "http://a:81/api", "identity": "x", "secret": "y"},
                 "beta": {"api_url": "http://b:81/api", "identity": "x", "secret": "y"},
@@ -49,7 +51,8 @@ class TestMultiInstance:
 
     def test_instance_proxy_defaults(self):
         s = Settings(
-            identity="i", secret="s",
+            identity="i",
+            secret="s",
             instances={
                 "prod": {
                     "api_url": "http://p:81/api",
@@ -76,7 +79,8 @@ class TestMultiInstance:
     def test_missing_required_field_raises(self):
         with pytest.raises(ValueError, match="missing required field"):
             Settings(
-                identity="i", secret="s",
+                identity="i",
+                secret="s",
                 instances={"bad": {"identity": "a", "secret": "b"}},
             )
 
@@ -88,28 +92,46 @@ class TestMultiInstance:
         # Invalid api_url type (int)
         with pytest.raises(ValueError, match="must be a string"):
             Settings(
-                identity="i", secret="s",
-                instances={"site1": {"api_url": 123, "identity": "a", "secret": "b"}}
+                identity="i",
+                secret="s",
+                instances={"site1": {"api_url": 123, "identity": "a", "secret": "b"}},
             )
 
         # Invalid log_dir type (list)
         with pytest.raises(ValueError, match="must be a string"):
             Settings(
-                identity="i", secret="s",
-                instances={"site1": {"api_url": "http://npm:81/api", "identity": "a", "secret": "b", "log_dir": []}}
+                identity="i",
+                secret="s",
+                instances={
+                    "site1": {
+                        "api_url": "http://npm:81/api",
+                        "identity": "a",
+                        "secret": "b",
+                        "log_dir": [],
+                    }
+                },
             )
 
         # Invalid proxy_defaults type (str)
         with pytest.raises(ValueError, match="must be an object"):
             Settings(
-                identity="i", secret="s",
-                instances={"site1": {"api_url": "http://npm:81/api", "identity": "a", "secret": "b", "proxy_defaults": "invalid"}}
+                identity="i",
+                secret="s",
+                instances={
+                    "site1": {
+                        "api_url": "http://npm:81/api",
+                        "identity": "a",
+                        "secret": "b",
+                        "proxy_defaults": "invalid",
+                    }
+                },
             )
 
     def test_default_instance_selection(self):
         # Explicit default instance configuration
         s = Settings(
-            identity="i", secret="s",
+            identity="i",
+            secret="s",
             default_instance="beta",
             instances={
                 "alpha": {"api_url": "http://a:81/api", "identity": "x", "secret": "y"},
@@ -123,7 +145,8 @@ class TestMultiInstance:
         # Explicit default instance configured but not present in instances list
         with pytest.raises(ValueError, match="is not in configured instances"):
             Settings(
-                identity="i", secret="s",
+                identity="i",
+                secret="s",
                 default_instance="gamma",
                 instances={
                     "alpha": {"api_url": "http://a:81/api", "identity": "x", "secret": "y"},

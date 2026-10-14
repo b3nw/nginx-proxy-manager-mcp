@@ -10,15 +10,15 @@ from npm_mcp.logs import (
 )
 
 SAMPLE_ACCESS_LOG = (
-    '[22/May/2025:10:00:01 +0000] - 200 200 - GET https app.example.com'
+    "[22/May/2025:10:00:01 +0000] - 200 200 - GET https app.example.com"
     ' "/" [Client 10.0.0.1] [Length 1542] "Mozilla/5.0" "-"\n'
-    '[22/May/2025:10:00:02 +0000] - 301 301 - GET http app.example.com'
+    "[22/May/2025:10:00:02 +0000] - 301 301 - GET http app.example.com"
     ' "/old-path" [Client 10.0.0.2] [Length 0] "curl/7.88" "-"\n'
-    '[22/May/2025:10:00:03 +0000] - 404 404 - GET https app.example.com'
+    "[22/May/2025:10:00:03 +0000] - 404 404 - GET https app.example.com"
     ' "/missing" [Client 10.0.0.1] [Length 548] "Mozilla/5.0" "-"\n'
-    '[22/May/2025:10:00:04 +0000] - 200 200 - POST https app.example.com'
+    "[22/May/2025:10:00:04 +0000] - 200 200 - POST https app.example.com"
     ' "/api/data" [Client 10.0.0.3] [Length 256] "python-requests/2.31" "-"\n'
-    '[22/May/2025:10:00:05 +0000] - 502 502 - GET https app.example.com'
+    "[22/May/2025:10:00:05 +0000] - 502 502 - GET https app.example.com"
     ' "/health" [Client 10.0.0.1] [Length 166] "kube-probe/1.28" "-"\n'
 )
 

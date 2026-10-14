@@ -112,16 +112,12 @@ class Settings(BaseSettings):
             for name, cfg in self.instances.items():
                 if not isinstance(cfg, dict):
                     raise ValueError(
-                        f"NPM_INSTANCES['{name}'] must be an object, "
-                        f"got {type(cfg).__name__}"
+                        f"NPM_INSTANCES['{name}'] must be an object, got {type(cfg).__name__}"
                     )
-                missing = [
-                    k for k in ("api_url", "identity", "secret") if not cfg.get(k)
-                ]
+                missing = [k for k in ("api_url", "identity", "secret") if not cfg.get(k)]
                 if missing:
                     raise ValueError(
-                        f"NPM_INSTANCES['{name}'] missing required field(s): "
-                        f"{missing}"
+                        f"NPM_INSTANCES['{name}'] missing required field(s): {missing}"
                     )
                 for field in ("api_url", "identity", "secret"):
                     val = cfg[field]
