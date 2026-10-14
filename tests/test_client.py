@@ -1,5 +1,7 @@
 """Tests for NpmClient."""
 
+import json
+
 import pytest
 from httpx import Response
 
@@ -253,3 +255,215 @@ class TestNpmClientEndpoints:
 
             msg = str(exc_info.value)
             assert msg.count("API error") == 0, f"Client should not prefix error: {msg}"
+
+
+MOCK_HOST_WITH_LOCATIONS = {
+    "id": 7,
+    "created_on": "2024-01-01T00:00:00Z",
+    "modified_on": "2024-01-01T00:00:00Z",
+    "owner_user_id": 1,
+    "domain_names": ["app.example.com"],
+    "forward_host": "192.168.1.100",
+    "forward_port": 8080,
+    "forward_scheme": "http",
+    "enabled": True,
+    "ssl_forced": False,
+    "advanced_config": "",
+    "locations": [
+        {
+            "path": "/",
+            "forward_scheme": "http",
+            "forward_host": "192.168.1.100",
+            "forward_port": 8080,
+            "advanced_config": "auth_request /guard;\n",
+            "access_list_id": 0,
+        },
+        {
+            "path": "/api",
+            "forward_scheme": "http",
+            "forward_host": "192.168.1.100",
+            "forward_port": 8080,
+            "forward_path": "/api",
+            "advanced_config": "",
+            "access_list_id": 0,
+        },
+    ],
+}
+
+
+def _api_request_body(httpx_mock, method):
+    """Return the parsed JSON body of the last API request with a method.
+
+    Filters by method because the login POST is also recorded.
+    """
+
+    requests = httpx_mock.get_requests(method=method)
+    api_requests = [r for r in requests if "/tokens" not in str(r.url)]
+    assert api_requests, f"no {method} API request recorded"
+    return json.loads(api_requests[-1].content)
+
+
+class TestProxyHostLocations:
+    """Test custom locations support on proxy hosts."""
+
+    @pytest.mark.asyncio
+    async def test_location_model_parses_all_fields(
+        self, httpx_mock, mock_token_response
+    ):
+        """Location model keeps forward_path and access_list_id."""
+        from npm_mcp.models import ProxyHost
+
+        host = ProxyHost(**MOCK_HOST_WITH_LOCATIONS)
+        assert host.locations is not None and len(host.locations) == 2
+        assert host.locations[0].advanced_config == "auth_request /guard;\n"
+        assert host.locations[1].forward_path == "/api"
+        assert host.locations[1].access_list_id == 0
+
+    @pytest.mark.asyncio
+    async def test_create_with_locations(
+        self, httpx_mock, mock_token_response, mock_created_proxy_host
+    ):
+        """Create sends the locations list in the POST body."""
+
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/nginx/proxy-hosts",
+            json=mock_created_proxy_host,
+            status_code=201,
+        )
+
+        locations = [
+            {
+                "path": "/api",
+                "forward_scheme": "http",
+                "forward_host": "10.0.0.50",
+                "forward_port": 3000,
+                "forward_path": "/api",
+                "advanced_config": "",
+                "access_list_id": 0,
+            }
+        ]
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            await client.create_proxy_host(
+                domain_names=["newapp.example.com"],
+                forward_host="10.0.0.50",
+                forward_port=3000,
+                locations=locations,
+            )
+
+            assert _api_request_body(httpx_mock, "POST")["locations"] == locations
+
+    @pytest.mark.asyncio
+    async def test_create_without_locations_omits_key(
+        self, httpx_mock, mock_token_response, mock_created_proxy_host
+    ):
+        """Create without locations must not send the key at all."""
+
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/nginx/proxy-hosts",
+            json=mock_created_proxy_host,
+            status_code=201,
+        )
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            await client.create_proxy_host(
+                domain_names=["newapp.example.com"],
+                forward_host="10.0.0.50",
+                forward_port=3000,
+            )
+
+            assert "locations" not in _api_request_body(httpx_mock, "POST")
+
+    @pytest.mark.asyncio
+    async def test_update_preserves_locations_when_omitted(
+        self, httpx_mock, mock_token_response
+    ):
+        """Update without locations must re-send the existing list (no drop)."""
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+        httpx_mock.add_response(
+            method="GET",
+            url="http://localhost:81/api/nginx/proxy-hosts/7?expand=owner%2Ccertificate",
+            json=MOCK_HOST_WITH_LOCATIONS,
+        )
+        httpx_mock.add_response(
+            method="PUT",
+            url="http://localhost:81/api/nginx/proxy-hosts/7",
+            json=MOCK_HOST_WITH_LOCATIONS,
+        )
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            await client.update_proxy_host(7, forward_port=9090)
+
+            body = _api_request_body(httpx_mock, "PUT")
+            assert body["forward_port"] == 9090
+            assert body["locations"] == MOCK_HOST_WITH_LOCATIONS["locations"]
+
+    @pytest.mark.asyncio
+    async def test_update_replaces_locations_when_provided(
+        self, httpx_mock, mock_token_response
+    ):
+        """An explicit locations list replaces the existing one entirely."""
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+        httpx_mock.add_response(
+            method="GET",
+            url="http://localhost:81/api/nginx/proxy-hosts/7?expand=owner%2Ccertificate",
+            json=MOCK_HOST_WITH_LOCATIONS,
+        )
+        httpx_mock.add_response(
+            method="PUT",
+            url="http://localhost:81/api/nginx/proxy-hosts/7",
+            json=MOCK_HOST_WITH_LOCATIONS,
+        )
+
+        replacement = [
+            {
+                "path": "/new",
+                "forward_scheme": "http",
+                "forward_host": "192.168.1.200",
+                "forward_port": 9000,
+                "advanced_config": "",
+                "access_list_id": 0,
+            }
+        ]
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            await client.update_proxy_host(7, locations=replacement)
+
+            body = _api_request_body(httpx_mock, "PUT")
+            assert body["locations"] == replacement

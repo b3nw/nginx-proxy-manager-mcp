@@ -67,7 +67,9 @@ class ProxyHostLocation(BaseModel):
     forward_host: str | None = None
     forward_port: int | None = None
     forward_scheme: str | None = None
+    forward_path: str | None = None
     advanced_config: str = ""
+    access_list_id: int = 0
 
 
 class ProxyHost(BaseModel):

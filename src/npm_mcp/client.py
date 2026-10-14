@@ -280,6 +280,7 @@ class NpmClient:
         access_list_id: int = 0,
         advanced_config: str = "",
         meta: dict | None = None,
+        locations: list[dict] | None = None,
     ) -> ProxyHost:
         """Create a new proxy host.
 
@@ -299,6 +300,9 @@ class NpmClient:
             access_list_id: Access list ID (0 for none, use list_access_lists to find)
             advanced_config: Custom nginx configuration
             meta: Additional metadata
+            locations: Custom location blocks. Each dict accepts path,
+                forward_scheme, forward_host, forward_port, forward_path,
+                advanced_config, and access_list_id. Omitted when None.
 
         Returns:
             Created ProxyHost object
@@ -320,6 +324,8 @@ class NpmClient:
             "advanced_config": advanced_config,
             "meta": meta or {},
         }
+        if locations is not None:
+            payload["locations"] = locations
 
         response = await self._request("POST", "/nginx/proxy-hosts", json=payload)
         return ProxyHost(**response.json())
@@ -357,6 +363,13 @@ class NpmClient:
             "advanced_config": existing.advanced_config,
             "meta": existing.meta,
         }
+        # Preserve existing custom locations: NPM replaces the whole list
+        # on PUT, so omitting the key would drop them. An explicit
+        # ``locations`` kwarg replaces the list entirely.
+        if existing.locations:
+            payload["locations"] = [
+                loc.model_dump(exclude_none=True) for loc in existing.locations
+            ]
         payload.update({k: v for k, v in kwargs.items() if v is not None})
 
         response = await self._request("PUT", f"/nginx/proxy-hosts/{host_id}", json=payload)
