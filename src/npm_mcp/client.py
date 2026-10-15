@@ -449,7 +449,7 @@ class NpmClient:
     async def create_certificate(
         self,
         domain_names: list[str],
-        email: str,
+        email: str = "",
         provider: str = "letsencrypt",
         dns_challenge: bool = False,
     ) -> Certificate:
@@ -457,7 +457,9 @@ class NpmClient:
 
         Args:
             domain_names: List of domain names for the certificate
-            email: Email address for Let's Encrypt notifications
+            email: Deprecated and unused; kept for backward compatibility.
+                NPM 2.x obtains the Let's Encrypt email from the authenticated
+                user account and rejects it in the request meta.
             provider: Certificate provider (default: "letsencrypt")
             dns_challenge: Use DNS challenge instead of HTTP (default: False)
 
@@ -466,11 +468,7 @@ class NpmClient:
         """
         payload = {
             "domain_names": domain_names,
-            "meta": {
-                "letsencrypt_email": email,
-                "letsencrypt_agree": True,
-                "dns_challenge": dns_challenge,
-            },
+            "meta": {"dns_challenge": dns_challenge},
             "provider": provider,
         }
 

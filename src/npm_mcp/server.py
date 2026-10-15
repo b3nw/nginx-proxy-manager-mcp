@@ -63,8 +63,7 @@ mcp = FastMCP(
 
 
 DESTRUCTIVE_DISABLED_MSG = (
-    "Destructive operations are disabled. "
-    "Set NPM_MCP_ENABLE_DESTRUCTIVE_TOOLS=true to enable."
+    "Destructive operations are disabled. Set NPM_MCP_ENABLE_DESTRUCTIVE_TOOLS=true to enable."
 )
 
 
@@ -150,10 +149,7 @@ async def list_proxy_hosts(instance: str | None = None) -> str:
             ssl_status = "\U0001f512 SSL" if host.ssl_forced else "\U0001f513 HTTP"
             enabled_status = "\u2705" if host.enabled else "\u274c"
             fwd = f"{host.forward_scheme}://{host.forward_host}:{host.forward_port}"
-            result.append(
-                f"{enabled_status} [{host.id}] {domains}\n"
-                f"   \u2192 {fwd} {ssl_status}"
-            )
+            result.append(f"{enabled_status} [{host.id}] {domains}\n   \u2192 {fwd} {ssl_status}")
 
         return f"Found {len(hosts)} proxy host(s):\n\n" + "\n\n".join(result)
 
@@ -256,8 +252,7 @@ async def get_system_health(instance: str | None = None) -> str:
             result.append(f"Log directory: \u2705 ({len(logs)} log files found)")
         else:
             result.append(
-                "Log directory: \u274c "
-                "(not configured \u2014 set NPM_LOG_DIR or instance log_dir)"
+                "Log directory: \u274c (not configured \u2014 set NPM_LOG_DIR or instance log_dir)"
             )
 
         return "\n".join(result)
@@ -267,9 +262,7 @@ async def get_system_health(instance: str | None = None) -> str:
 
 
 @mcp.tool()
-async def search_audit_logs(
-    limit: int = 50, offset: int = 0, instance: str | None = None
-) -> str:
+async def search_audit_logs(limit: int = 50, offset: int = 0, instance: str | None = None) -> str:
     """Search the audit log for recent actions in Nginx Proxy Manager.
 
     Args:
@@ -410,9 +403,7 @@ async def create_proxy_host(
             http2_support=defaults.get("http2_support", True),
             block_exploits=_or(block_exploits, "block_exploits"),
             caching_enabled=defaults.get("caching_enabled", False),
-            allow_websocket_upgrade=_or(
-                allow_websocket_upgrade, "allow_websocket_upgrade"
-            ),
+            allow_websocket_upgrade=_or(allow_websocket_upgrade, "allow_websocket_upgrade"),
             access_list_id=_or(access_list_id, "access_list_id"),
             advanced_config=_or(advanced_config, "advanced_config"),
             meta=defaults.get("meta", {}),
@@ -624,7 +615,11 @@ async def get_proxy_host_logs(
             )
 
         result = read_log_lines(
-            host_id=host_id, log_type=log_type, lines=lines, search=search, log_dir=log_dir,
+            host_id=host_id,
+            log_type=log_type,
+            lines=lines,
+            search=search,
+            log_dir=log_dir,
         )
 
         header_parts = [
@@ -650,7 +645,7 @@ async def get_proxy_host_logs(
 @mcp.tool()
 async def create_certificate(
     domain_names: list[str],
-    email: str,
+    email: str = "",
     dns_challenge: bool = False,
     instance: str | None = None,
 ) -> str:
@@ -658,7 +653,8 @@ async def create_certificate(
 
     Args:
         domain_names: List of domain names for the certificate
-        email: Email address for Let's Encrypt notifications
+        email: Deprecated and optional; ignored. NPM 2.x manages certificate
+            emails from the authenticated user account.
         dns_challenge: Use DNS challenge instead of HTTP (default: False)
         instance: NPM instance name (omit for default)
     """
@@ -667,7 +663,9 @@ async def create_certificate(
     try:
         client, _ = _resolve(instance)
         cert = await client.create_certificate(
-            domain_names=domain_names, email=email, dns_challenge=dns_challenge,
+            domain_names=domain_names,
+            email=email,
+            dns_challenge=dns_challenge,
         )
 
         domains = ", ".join(cert.domain_names)

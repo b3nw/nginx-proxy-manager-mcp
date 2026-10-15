@@ -3,10 +3,9 @@
 import json
 
 import pytest
-from httpx import Response
 
 from npm_mcp.client import NpmClient
-from npm_mcp.exceptions import NpmApiError, NpmAuthenticationError, NpmConnectionError
+from npm_mcp.exceptions import NpmApiError, NpmAuthenticationError
 
 
 @pytest.fixture
@@ -541,3 +540,108 @@ class TestProxyHostLocations:
 
             body = _api_request_body(httpx_mock, "PUT")
             assert body["locations"] == []
+
+
+@pytest.fixture
+def mock_created_certificate():
+    """Mock response for created certificate."""
+    return {
+        "id": 7,
+        "created_on": "2024-01-15T10:00:00Z",
+        "modified_on": "2024-01-15T10:00:00Z",
+        "owner_user_id": 1,
+        "provider": "letsencrypt",
+        "nice_name": "app.example.com",
+        "domain_names": ["app.example.com"],
+        "expires_on": "2024-04-15T10:00:00Z",
+        "meta": {"dns_challenge": False},
+    }
+
+
+def _certificate_payload(httpx_mock) -> dict:
+    """Return the JSON payload sent to POST /nginx/certificates."""
+    requests = [
+        r for r in httpx_mock.get_requests(method="POST") if r.url.path == "/api/nginx/certificates"
+    ]
+    assert len(requests) == 1
+    return json.loads(requests[0].content)
+
+
+class TestNpmClientCertificates:
+    """Test certificate creation (issue #17: NPM 2.x meta schema)."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_api(self, httpx_mock, mock_token_response, mock_created_certificate):
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/nginx/certificates",
+            json=mock_created_certificate,
+            status_code=201,
+        )
+
+    @staticmethod
+    def _client() -> NpmClient:
+        return NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_certificate_payload(self, httpx_mock):
+        """Payload must only contain meta keys accepted by NPM 2.x."""
+        async with self._client() as client:
+            await client.create_certificate(domain_names=["app.example.com"])
+
+        payload = _certificate_payload(httpx_mock)
+        assert payload == {
+            "domain_names": ["app.example.com"],
+            "meta": {"dns_challenge": False},
+            "provider": "letsencrypt",
+        }
+        assert "letsencrypt_email" not in payload["meta"]
+        assert "letsencrypt_agree" not in payload["meta"]
+
+    @pytest.mark.asyncio
+    async def test_create_certificate_with_deprecated_email(self, httpx_mock):
+        """Deprecated email argument is accepted but never sent."""
+        async with self._client() as client:
+            await client.create_certificate(
+                domain_names=["app.example.com"], email="test@example.com"
+            )
+
+        payload = _certificate_payload(httpx_mock)
+        assert "letsencrypt_email" not in payload["meta"]
+        assert "email" not in payload["meta"]
+        assert "letsencrypt_email" not in payload
+        assert "email" not in payload
+        assert "test@example.com" not in json.dumps(payload)
+
+    @pytest.mark.asyncio
+    async def test_create_certificate_dns_challenge(self, httpx_mock):
+        """dns_challenge flag is forwarded in meta."""
+        async with self._client() as client:
+            await client.create_certificate(domain_names=["app.example.com"], dns_challenge=True)
+
+        payload = _certificate_payload(httpx_mock)
+        assert payload["meta"] == {"dns_challenge": True}
+
+    @pytest.mark.asyncio
+    async def test_create_certificate_response_parsing(self):
+        """Response is parsed into a Certificate model."""
+        async with self._client() as client:
+            cert = await client.create_certificate(domain_names=["app.example.com"])
+
+        assert cert.id == 7
+        assert cert.domain_names == ["app.example.com"]
+        assert cert.provider == "letsencrypt"
+        assert cert.nice_name == "app.example.com"
+        assert cert.owner_user_id == 1
+        assert cert.expires_on is not None
+        assert cert.expires_on.strftime("%Y-%m-%d") == "2024-04-15"
+        assert cert.meta == {"dns_challenge": False}
