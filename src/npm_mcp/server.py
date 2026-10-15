@@ -6,11 +6,13 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastmcp import FastMCP
+from pydantic import BaseModel, Field
 
 from .client import NpmClient
 from .config import NpmInstance, settings
 from .exceptions import NpmApiError, NpmAuthenticationError, NpmConnectionError, NpmLogError
 from .logs import is_log_dir_configured, list_available_logs, read_log_lines
+from .models import ForwardScheme
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,25 @@ def _check_destructive() -> str | None:
     if not settings.mcp_enable_destructive_tools:
         return DESTRUCTIVE_DISABLED_MSG
     return None
+
+
+class ProxyHostLocationInput(BaseModel):
+    """Custom location block for create/update proxy host tools."""
+
+    path: str = Field(description="Location path (e.g. '/' or '/api')")
+    forward_scheme: ForwardScheme = Field(description="Backend protocol")
+    forward_host: str = Field(description="Backend host/IP to forward to")
+    forward_port: int = Field(description="Backend port to forward to")
+    forward_path: str | None = Field(
+        default=None, description="Path prefix to forward to on the backend"
+    )
+    advanced_config: str | None = Field(
+        default=None, description="Per-location custom nginx configuration"
+    )
+    access_list_id: int | None = Field(
+        default=None,
+        description="Per-location access list ID (omit to leave unset)",
+    )
 
 
 def _format_error(e: Exception) -> str:
@@ -347,7 +368,7 @@ async def create_proxy_host(
     allow_websocket_upgrade: bool | None = None,
     access_list_id: int | None = None,
     advanced_config: str | None = None,
-    locations: list[dict] | None = None,
+    locations: list[ProxyHostLocationInput] | None = None,
     instance: str | None = None,
 ) -> str:
     """Create a new proxy host in Nginx Proxy Manager.
@@ -395,7 +416,11 @@ async def create_proxy_host(
             access_list_id=_or(access_list_id, "access_list_id"),
             advanced_config=_or(advanced_config, "advanced_config"),
             meta=defaults.get("meta", {}),
-            locations=locations,
+            locations=(
+                [loc.model_dump(exclude_none=True) for loc in locations]
+                if locations is not None
+                else None
+            ),
         )
 
         domains = ", ".join(host.domain_names)
@@ -423,7 +448,7 @@ async def update_proxy_host(
     allow_websocket_upgrade: bool | None = None,
     access_list_id: int | None = None,
     advanced_config: str | None = None,
-    locations: list[dict] | None = None,
+    locations: list[ProxyHostLocationInput] | None = None,
     instance: str | None = None,
 ) -> str:
     """Update an existing proxy host in Nginx Proxy Manager.
@@ -473,7 +498,7 @@ async def update_proxy_host(
         if advanced_config is not None:
             kwargs["advanced_config"] = advanced_config
         if locations is not None:
-            kwargs["locations"] = locations
+            kwargs["locations"] = [loc.model_dump(exclude_none=True) for loc in locations]
 
         host = await client.update_proxy_host(host_id, **kwargs)
 

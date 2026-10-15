@@ -1,9 +1,17 @@
 """Pydantic models for NPM API responses."""
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+class ForwardScheme(StrEnum):
+    """Backend protocol for proxy forwarding."""
+
+    HTTP = "http"
+    HTTPS = "https"
 
 
 class TokenResponse(BaseModel):
@@ -69,7 +77,7 @@ class ProxyHostLocation(BaseModel):
     forward_scheme: str | None = None
     forward_path: str | None = None
     advanced_config: str = ""
-    access_list_id: int = 0
+    access_list_id: int | None = None
 
 
 class ProxyHost(BaseModel):

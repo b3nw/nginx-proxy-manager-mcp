@@ -366,9 +366,15 @@ class NpmClient:
         # Preserve existing custom locations: NPM replaces the whole list
         # on PUT, so omitting the key would drop them. An explicit
         # ``locations`` kwarg replaces the list entirely.
+        # Omit ``access_list_id`` unless explicitly set to a positive id.
         if existing.locations:
             payload["locations"] = [
-                loc.model_dump(exclude_none=True) for loc in existing.locations
+                {
+                    k: v
+                    for k, v in loc.model_dump(exclude_none=True).items()
+                    if k != "access_list_id" or (v is not None and v > 0)
+                }
+                for loc in existing.locations
             ]
         payload.update({k: v for k, v in kwargs.items() if v is not None})
 
