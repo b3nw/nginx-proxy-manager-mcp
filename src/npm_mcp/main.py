@@ -57,11 +57,13 @@ def main() -> None:
         # Mount /health directly on the inner router
         from starlette.responses import PlainTextResponse
         from starlette.routing import Route
+
         app.router.routes.insert(0, Route("/health", lambda r: PlainTextResponse("ok")))
 
         if settings.mcp_auth_token:
             logger.info("Bearer token authentication enabled")
             from .auth import BearerAuthMiddleware
+
             app.add_middleware(BearerAuthMiddleware, token=settings.mcp_auth_token)
 
         import uvicorn
@@ -71,4 +73,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
