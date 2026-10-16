@@ -6,11 +6,13 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastmcp import FastMCP
+from pydantic import BaseModel, Field
 
 from .client import NpmClient
 from .config import NpmInstance, settings
 from .exceptions import NpmApiError, NpmAuthenticationError, NpmConnectionError, NpmLogError
 from .logs import is_log_dir_configured, list_available_logs, read_log_lines
+from .models import ForwardScheme
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +72,25 @@ def _check_destructive() -> str | None:
     if not settings.mcp_enable_destructive_tools:
         return DESTRUCTIVE_DISABLED_MSG
     return None
+
+
+class ProxyHostLocationInput(BaseModel):
+    """Custom location block for create/update proxy host tools."""
+
+    path: str = Field(description="Location path (e.g. '/' or '/api')")
+    forward_scheme: ForwardScheme = Field(description="Backend protocol")
+    forward_host: str = Field(description="Backend host/IP to forward to")
+    forward_port: int = Field(description="Backend port to forward to")
+    forward_path: str | None = Field(
+        default=None, description="Path prefix to forward to on the backend"
+    )
+    advanced_config: str | None = Field(
+        default=None, description="Per-location custom nginx configuration"
+    )
+    access_list_id: int | None = Field(
+        default=None,
+        description="Per-location access list ID (omit to leave unset)",
+    )
 
 
 def _format_error(e: Exception) -> str:
@@ -181,8 +202,12 @@ async def get_proxy_host_details(host_id: int, instance: str | None = None) -> s
             details["locations"] = [
                 {
                     "path": loc.path,
+                    "forward_scheme": loc.forward_scheme,
                     "forward_host": loc.forward_host,
                     "forward_port": loc.forward_port,
+                    "forward_path": loc.forward_path,
+                    "advanced_config": loc.advanced_config,
+                    "access_list_id": loc.access_list_id,
                 }
                 for loc in host.locations
             ]
@@ -336,6 +361,7 @@ async def create_proxy_host(
     allow_websocket_upgrade: bool | None = None,
     access_list_id: int | None = None,
     advanced_config: str | None = None,
+    locations: list[ProxyHostLocationInput] | None = None,
     instance: str | None = None,
 ) -> str:
     """Create a new proxy host in Nginx Proxy Manager.
@@ -351,6 +377,9 @@ async def create_proxy_host(
         allow_websocket_upgrade: Allow WebSocket connections (default from config)
         access_list_id: Access list ID (0 for no restrictions)
         advanced_config: Custom nginx configuration block
+        locations: Custom location blocks. Each dict accepts path,
+            forward_scheme, forward_host, forward_port, forward_path,
+            advanced_config, and access_list_id.
         instance: NPM instance name (omit for default)
     """
     if msg := _check_destructive():
@@ -378,6 +407,11 @@ async def create_proxy_host(
             access_list_id=_or(access_list_id, "access_list_id"),
             advanced_config=_or(advanced_config, "advanced_config"),
             meta=defaults.get("meta", {}),
+            locations=(
+                [loc.model_dump(exclude_none=True) for loc in locations]
+                if locations is not None
+                else None
+            ),
         )
 
         domains = ", ".join(host.domain_names)
@@ -405,11 +439,14 @@ async def update_proxy_host(
     allow_websocket_upgrade: bool | None = None,
     access_list_id: int | None = None,
     advanced_config: str | None = None,
+    locations: list[ProxyHostLocationInput] | None = None,
     instance: str | None = None,
 ) -> str:
     """Update an existing proxy host in Nginx Proxy Manager.
 
     Only provided fields will be updated; all others remain unchanged.
+    Custom locations are preserved when omitted. Passing ``locations``
+    replaces the entire locations list on the host.
 
     Args:
         host_id: The ID of the proxy host to update
@@ -422,6 +459,10 @@ async def update_proxy_host(
         allow_websocket_upgrade: Allow WebSocket connections
         access_list_id: Access list ID (0 for no restrictions)
         advanced_config: Custom nginx configuration block
+        locations: Full replacement list of custom location blocks
+            (each: path, forward_scheme, forward_host, forward_port,
+            forward_path, advanced_config, access_list_id). Omit to
+            leave existing locations unchanged.
         instance: NPM instance name (omit for default)
     """
     if msg := _check_destructive():
@@ -447,6 +488,8 @@ async def update_proxy_host(
             kwargs["access_list_id"] = access_list_id
         if advanced_config is not None:
             kwargs["advanced_config"] = advanced_config
+        if locations is not None:
+            kwargs["locations"] = [loc.model_dump(exclude_none=True) for loc in locations]
 
         host = await client.update_proxy_host(host_id, **kwargs)
 
