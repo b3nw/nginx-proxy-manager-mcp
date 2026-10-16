@@ -150,12 +150,12 @@ Add to your `claude_desktop_config.json`:
 | `search_audit_logs` | Query audit log entries |
 | `list_certificates` | List SSL certificates |
 | `list_access_lists` | List access lists for authentication/IP restrictions |
-| `create_proxy_host` | Create a new proxy host |
-| `update_proxy_host` | Update an existing proxy host (v0.0.3+) |
+| `create_proxy_host` | Create a new proxy host (supports custom locations in v0.0.7+) |
+| `update_proxy_host` | Update an existing proxy host (v0.0.3+, custom locations in v0.0.7+) |
 | `delete_proxy_host` | Delete a proxy host permanently (v0.0.4+) |
 | `enable_proxy_host` | Enable (bring online) a disabled proxy host (v0.0.4+) |
 | `disable_proxy_host` | Disable (take offline) a proxy host without deleting it (v0.0.4+) |
-| `create_certificate` | Provision a new Let's Encrypt SSL certificate (v0.0.3+) |
+| `create_certificate` | Provision a new Let's Encrypt SSL certificate (v0.0.3+, NPM 2.x compatible) |
 
 ## Managing Proxy Host Lifecycle
 
@@ -183,6 +183,36 @@ Notes:
 - `delete_proxy_host` maps to `DELETE /nginx/proxy-hosts/{id}` and is
   destructive — the reverse proxy stops serving the host's domains
   immediately. Recreate it with `create_proxy_host` if you need it back.
+
+## Custom Location Blocks (v0.0.7+)
+
+Both `create_proxy_host` and `update_proxy_host` support configuring custom Nginx location blocks (e.g. for path-based routing or auth guards):
+
+```python
+locations = [
+    {
+        "path": "/api",
+        "forward_scheme": "http",  # "http" or "https"
+        "forward_host": "10.0.0.50",
+        "forward_port": 3000,
+        "forward_path": "/api",  # optional backend path prefix
+        "advanced_config": "",  # optional per-location nginx directives
+        "access_list_id": 0,  # optional access list ID
+    }
+]
+
+create_proxy_host(
+    domain_names=["app.example.com"],
+    forward_host="10.0.0.10",
+    forward_port=8080,
+    locations=locations,
+)
+```
+
+**Location Preservation on Updates:**
+* When updating a proxy host with `update_proxy_host`, existing custom locations are **preserved by default** when `locations` is omitted.
+* To replace the entire locations list, pass a new `locations=[...]` list.
+* To remove all custom locations from a host, pass an empty list: `locations=[]`.
 
 ## Log Access Setup
 
@@ -283,6 +313,10 @@ pytest
 # Lint
 ruff check src/
 ```
+
+## Contributors
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the list of individuals who have contributed to `nginx-proxy-manager-mcp`.
 
 ## License
 
