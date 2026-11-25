@@ -182,6 +182,7 @@ async def get_proxy_host_details(host_id: int, instance: str | None = None) -> s
                 "forced": host.ssl_forced,
                 "certificate_id": host.certificate_id,
                 "hsts_enabled": host.hsts_enabled,
+                "hsts_subdomains": host.hsts_subdomains,
                 "http2_support": host.http2_support,
             },
             "security": {
@@ -357,6 +358,9 @@ async def create_proxy_host(
     forward_scheme: str | None = None,
     certificate_id: int | None = None,
     ssl_forced: bool | None = None,
+    hsts_enabled: bool | None = None,
+    hsts_subdomains: bool | None = None,
+    http2_support: bool | None = None,
     block_exploits: bool | None = None,
     allow_websocket_upgrade: bool | None = None,
     access_list_id: int | None = None,
@@ -373,6 +377,9 @@ async def create_proxy_host(
         forward_scheme: Backend protocol - "http" or "https" (default from config)
         certificate_id: SSL certificate ID (0 for none)
         ssl_forced: Force HTTPS redirect (default from config)
+        hsts_enabled: Enable HSTS (default from config)
+        hsts_subdomains: Include subdomains in HSTS (default from config)
+        http2_support: Enable HTTP/2 (default from config)
         block_exploits: Enable common exploit blocking (default from config)
         allow_websocket_upgrade: Allow WebSocket connections (default from config)
         access_list_id: Access list ID (0 for no restrictions)
@@ -398,9 +405,9 @@ async def create_proxy_host(
             forward_scheme=_or(forward_scheme, "forward_scheme"),
             certificate_id=_or(certificate_id, "certificate_id"),
             ssl_forced=_or(ssl_forced, "ssl_forced"),
-            hsts_enabled=defaults.get("hsts_enabled", True),
-            hsts_subdomains=defaults.get("hsts_subdomains", False),
-            http2_support=defaults.get("http2_support", True),
+            hsts_enabled=_or(hsts_enabled, "hsts_enabled"),
+            hsts_subdomains=_or(hsts_subdomains, "hsts_subdomains"),
+            http2_support=_or(http2_support, "http2_support"),
             block_exploits=_or(block_exploits, "block_exploits"),
             caching_enabled=defaults.get("caching_enabled", False),
             allow_websocket_upgrade=_or(allow_websocket_upgrade, "allow_websocket_upgrade"),
@@ -435,6 +442,9 @@ async def update_proxy_host(
     forward_scheme: str | None = None,
     certificate_id: int | None = None,
     ssl_forced: bool | None = None,
+    hsts_enabled: bool | None = None,
+    hsts_subdomains: bool | None = None,
+    http2_support: bool | None = None,
     block_exploits: bool | None = None,
     allow_websocket_upgrade: bool | None = None,
     access_list_id: int | None = None,
@@ -455,6 +465,9 @@ async def update_proxy_host(
         forward_scheme: Backend protocol - "http" or "https"
         certificate_id: SSL certificate ID (0 for none)
         ssl_forced: Force HTTPS redirect
+        hsts_enabled: Enable HSTS
+        hsts_subdomains: Include subdomains in HSTS
+        http2_support: Enable HTTP/2
         block_exploits: Enable common exploit blocking
         allow_websocket_upgrade: Allow WebSocket connections
         access_list_id: Access list ID (0 for no restrictions)
@@ -480,6 +493,12 @@ async def update_proxy_host(
             kwargs["certificate_id"] = certificate_id
         if ssl_forced is not None:
             kwargs["ssl_forced"] = ssl_forced
+        if hsts_enabled is not None:
+            kwargs["hsts_enabled"] = hsts_enabled
+        if hsts_subdomains is not None:
+            kwargs["hsts_subdomains"] = hsts_subdomains
+        if http2_support is not None:
+            kwargs["http2_support"] = http2_support
         if block_exploits is not None:
             kwargs["block_exploits"] = block_exploits
         if allow_websocket_upgrade is not None:
