@@ -242,20 +242,21 @@ class NpmClient:
     ) -> list[AuditLogEntry]:
         """Get audit log entries.
 
+        NPM's ``GET /audit-log`` ignores ``limit`` and ``offset`` query
+        parameters and always returns the most recent entries (newest first,
+        capped by NPM itself). Pagination is therefore applied client-side.
+
         Args:
             limit: Maximum number of entries to return
-            offset: Offset for pagination
+            offset: Number of entries to skip
 
         Returns:
             List of AuditLogEntry objects
         """
-        response = await self._request(
-            "GET",
-            "/audit-log",
-            params={"limit": limit, "offset": offset},
-        )
+        response = await self._request("GET", "/audit-log")
         data = response.json()
-        return [AuditLogEntry(**entry) for entry in data]
+        entries = [AuditLogEntry(**entry) for entry in data]
+        return entries[offset : offset + limit]
 
     async def get_access_lists(self) -> list[AccessList]:
         """Get all access lists."""

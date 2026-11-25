@@ -645,3 +645,72 @@ class TestNpmClientCertificates:
         assert cert.expires_on is not None
         assert cert.expires_on.strftime("%Y-%m-%d") == "2024-04-15"
         assert cert.meta == {"dns_challenge": False}
+
+
+def _audit_entries(count):
+    """Build ``count`` audit log entries, newest first (as NPM returns them)."""
+    return [
+        {
+            "id": count - i,
+            "created_on": "2024-01-01T00:00:00Z",
+            "modified_on": "2024-01-01T00:00:00Z",
+            "user_id": 1,
+            "object_type": "proxy-host",
+            "object_id": count - i,
+            "action": "updated",
+        }
+        for i in range(count)
+    ]
+
+
+class TestAuditLog:
+    """NPM ignores limit/offset on /audit-log, so the client paginates locally."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_login(self, httpx_mock, mock_token_response):
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json=mock_token_response,
+        )
+
+    async def _fetch(self, httpx_mock, total, **kwargs):
+        httpx_mock.add_response(
+            method="GET",
+            url="http://localhost:81/api/audit-log",
+            json=_audit_entries(total),
+        )
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            return await client.get_audit_log(**kwargs)
+
+    @pytest.mark.asyncio
+    async def test_limit_is_applied(self, httpx_mock):
+        entries = await self._fetch(httpx_mock, total=10, limit=3)
+        assert [e.id for e in entries] == [10, 9, 8]
+
+    @pytest.mark.asyncio
+    async def test_offset_is_applied(self, httpx_mock):
+        entries = await self._fetch(httpx_mock, total=10, limit=3, offset=2)
+        assert [e.id for e in entries] == [8, 7, 6]
+
+    @pytest.mark.asyncio
+    async def test_limit_larger_than_available(self, httpx_mock):
+        entries = await self._fetch(httpx_mock, total=4, limit=50)
+        assert len(entries) == 4
+
+    @pytest.mark.asyncio
+    async def test_offset_past_end_returns_empty(self, httpx_mock):
+        entries = await self._fetch(httpx_mock, total=4, limit=10, offset=10)
+        assert entries == []
+
+    @pytest.mark.asyncio
+    async def test_no_pagination_params_sent(self, httpx_mock):
+        await self._fetch(httpx_mock, total=3, limit=1, offset=1)
+        api_requests = [
+            r for r in httpx_mock.get_requests(method="GET") if "/audit-log" in str(r.url)
+        ]
+        assert api_requests and not api_requests[0].url.params
