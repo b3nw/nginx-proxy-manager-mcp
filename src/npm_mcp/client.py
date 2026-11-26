@@ -48,6 +48,7 @@ class NpmClient:
         self._secret = secret or settings.secret
         self._token: str | None = None
         self._token_expires: datetime | None = None
+        self._cookie_auth = False
         self._client = httpx.AsyncClient(timeout=timeout)
 
     async def __aenter__(self) -> "NpmClient":
@@ -96,17 +97,51 @@ class NpmClient:
             raise NpmApiError(f"Login failed: {response.text}", status_code=response.status_code)
 
         data = response.json()
+
+        # Stock NPM returns {"token": <jwt>, "expires": ...} in the body and
+        # authenticates via the Authorization header. NPMPlus (2026-10-22+)
+        # returns only {"expires": ...} and sets the JWT as a signed
+        # `__Host-Http-token` cookie; it ignores the Authorization header
+        # entirely. httpx persists the Set-Cookie from this response and
+        # replays it on subsequent requests, so for NPMPlus we ride the
+        # cookie jar and never put the cookie credential in a header.
         token_response = TokenResponse(**data)
 
         self._token = token_response.token
         self._token_expires = token_response.expires
+        self._cookie_auth = False
+
+        if not self._token:
+            # Only trust a cookie delivered by THIS login response, not one
+            # left over in the shared jar by a previous session.
+            cookie_token = response.cookies.get("__Host-Http-token")
+            if cookie_token:
+                if not self.base_url.startswith("https://"):
+                    raise NpmAuthenticationError(
+                        "NPMPlus returned the token as a Secure "
+                        "__Host-Http-token cookie; cookie authentication "
+                        "requires an HTTPS NPM_API_URL"
+                    )
+                # Keep the credential in the cookie jar only. The jar now
+                # holds the cookie from this response; httpx sends it on
+                # subsequent requests. _token stays None so no Bearer
+                # header is ever set with this value.
+                self._cookie_auth = True
+        if not self._token and not self._cookie_auth:
+            raise NpmApiError(
+                "Login succeeded but no token was returned in the body or "
+                "as the __Host-Http-token cookie",
+                status_code=response.status_code,
+            )
 
         logger.info("Successfully authenticated with NPM")
         return token_response
 
     def _is_token_valid(self) -> bool:
         """Check if the current token is still valid (with 1 min buffer)."""
-        if not self._token or not self._token_expires:
+        if not self._token and not self._cookie_auth:
+            return False
+        if not self._token_expires:
             return False
         buffer = timedelta(minutes=1)
         return datetime.now(UTC) < (self._token_expires - buffer)
@@ -145,7 +180,11 @@ class NpmClient:
         await self._ensure_authenticated()
 
         headers = kwargs.pop("headers", {})
-        headers["Authorization"] = f"Bearer {self._token}"
+        if self._token:
+            # Stock NPM: Bearer token auth. In NPMPlus cookie mode _token
+            # stays None and httpx sends the persisted __Host-Http-token
+            # cookie instead; the credential never appears in a header.
+            headers["Authorization"] = f"Bearer {self._token}"
 
         url = f"{self.base_url}{endpoint}"
 
@@ -160,7 +199,8 @@ class NpmClient:
         if response.status_code == 401:
             logger.info("Token expired, re-authenticating...")
             await self.login()
-            headers["Authorization"] = f"Bearer {self._token}"
+            if self._token:
+                headers["Authorization"] = f"Bearer {self._token}"
             response = await self._client.request(method, url, headers=headers, **kwargs)
 
             if response.status_code == 401:
