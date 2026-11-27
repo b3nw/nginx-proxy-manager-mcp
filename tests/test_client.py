@@ -106,6 +106,211 @@ class TestNpmClientAuth:
             assert client._token == "test-jwt-token"
 
     @pytest.mark.asyncio
+    async def test_login_npmplus_cookie_token(self, httpx_mock):
+        """NPMPlus returns only {"expires": ...} and sets the token as a
+        signed __Host-Http-token cookie (issue #21). The cookie credential
+        must stay in the jar and never leak into a Bearer header."""
+        httpx_mock.add_response(
+            method="POST",
+            url="https://npm.example.com/api/tokens",
+            json={"expires": "2099-12-31T23:59:59Z"},
+            headers={
+                "Set-Cookie": (
+                    "__Host-Http-token=s%3Acookie-jwt.abc123; "
+                    "Path=/; HttpOnly; Secure; SameSite=Strict"
+                )
+            },
+        )
+
+        async with NpmClient(
+            base_url="https://npm.example.com/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            result = await client.login()
+
+            assert result.token is None
+            assert client._token is None
+            assert client._cookie_auth is True
+            assert client._token_expires is not None
+            # httpx persisted the cookie for subsequent requests
+            assert client._client.cookies.get("__Host-Http-token")
+
+    @pytest.mark.asyncio
+    async def test_login_npmplus_http_url_rejected(self, httpx_mock):
+        """Over plain HTTP the Secure cookie is stored by httpx but never
+        sent, so cookie auth cannot work; login must fail closed with a
+        clear error instead of reporting success (R1-P2)."""
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json={"expires": "2099-12-31T23:59:59Z"},
+            headers={
+                "Set-Cookie": (
+                    "__Host-Http-token=s%3Acookie-jwt.abc123; "
+                    "Path=/; HttpOnly; Secure; SameSite=Strict"
+                )
+            },
+        )
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            with pytest.raises(NpmAuthenticationError, match="HTTPS NPM_API_URL"):
+                await client.login()
+            assert client._token is None
+            assert client._cookie_auth is False
+
+    @pytest.mark.asyncio
+    async def test_login_npmplus_stale_jar_cookie_not_trusted(self, httpx_mock):
+        """A 200 login response without a body token and without a fresh
+        Set-Cookie must not be rescued by a cookie left in the shared jar
+        by a previous login (R1-P3)."""
+        async with NpmClient(
+            base_url="https://npm.example.com/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            # Simulate a previous session's cookie persisting in the jar
+            client._client.cookies.set(
+                "__Host-Http-token", "s%3Aold-jwt.old", domain="npm.example.com"
+            )
+            httpx_mock.add_response(
+                method="POST",
+                url="https://npm.example.com/api/tokens",
+                json={"expires": "2099-12-31T23:59:59Z"},
+            )
+            with pytest.raises(NpmApiError, match="no token was returned"):
+                await client.login()
+            assert client._cookie_auth is False
+
+    @pytest.mark.asyncio
+    async def test_login_npmplus_cookie_sent_on_requests(self, httpx_mock, mock_proxy_hosts):
+        """After NPMPlus login, the persisted cookie must be sent on API
+        requests and no Authorization header may carry the credential."""
+        httpx_mock.add_response(
+            method="POST",
+            url="https://npm.example.com/api/tokens",
+            json={"expires": "2099-12-31T23:59:59Z"},
+            headers={
+                "Set-Cookie": (
+                    "__Host-Http-token=s%3Acookie-jwt.abc123; "
+                    "Path=/; HttpOnly; Secure; SameSite=Strict"
+                )
+            },
+        )
+        httpx_mock.add_response(
+            method="GET",
+            url="https://npm.example.com/api/nginx/proxy-hosts?expand=owner%2Ccertificate",
+            json=mock_proxy_hosts,
+        )
+
+        async with NpmClient(
+            base_url="https://npm.example.com/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            hosts = await client.get_proxy_hosts()
+
+            assert len(hosts) == 1
+            api_requests = [r for r in httpx_mock.get_requests() if r.url.path != "/api/tokens"]
+            assert len(api_requests) == 1
+            req = api_requests[0]
+            cookie_header = req.headers.get("cookie", "")
+            assert "__Host-Http-token=s%3Acookie-jwt.abc123" in cookie_header
+            # P2 regression guard: the cookie credential must never be sent
+            # as a Bearer header.
+            assert "s%3Acookie-jwt" not in req.headers.get("authorization", "")
+
+    @pytest.mark.asyncio
+    async def test_status_probe_does_not_send_session_cookie(self, httpx_mock):
+        """The unauthenticated GET / status probe may hit a different app
+        behind the same hostname; it must neither send nor update the
+        NPMPlus session cookie (R2-P2)."""
+        httpx_mock.add_response(
+            method="POST",
+            url="https://npm.example.com/api/tokens",
+            json={"expires": "2099-12-31T23:59:59Z"},
+            headers={
+                "Set-Cookie": (
+                    "__Host-Http-token=s%3Acookie-jwt.abc123; "
+                    "Path=/; HttpOnly; Secure; SameSite=Strict"
+                )
+            },
+        )
+        httpx_mock.add_response(
+            method="GET",
+            url="https://npm.example.com/",
+            json={"version": {"version": "2.12.0", "title": "Nginx Proxy Manager"}},
+            headers={"Set-Cookie": "__Host-Http-token=s%3Aother-app; Path=/; Secure"},
+        )
+
+        async with NpmClient(
+            base_url="https://npm.example.com/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            await client.login()
+            status = await client.get_status()
+
+            assert status.version == {
+                "version": "2.12.0",
+                "title": "Nginx Proxy Manager",
+            }
+            probe = [r for r in httpx_mock.get_requests() if r.url.path == "/"]
+            assert len(probe) == 1
+            assert "cookie" not in probe[0].headers
+            assert "authorization" not in probe[0].headers
+            # The probe response must not overwrite the API session cookie
+            assert client._client.cookies.get("__Host-Http-token") == "s%3Acookie-jwt.abc123"
+
+    @pytest.mark.asyncio
+    async def test_login_npmplus_uppercase_https_scheme(self, httpx_mock):
+        """An uppercase HTTPS:// API URL is still HTTPS; the Secure-cookie
+        check must use the parsed scheme, not a case-sensitive prefix."""
+        httpx_mock.add_response(
+            method="POST",
+            url="https://npm.example.com/api/tokens",
+            json={"expires": "2099-12-31T23:59:59Z"},
+            headers={
+                "Set-Cookie": (
+                    "__Host-Http-token=s%3Acookie-jwt.abc123; "
+                    "Path=/; HttpOnly; Secure; SameSite=Strict"
+                )
+            },
+        )
+
+        async with NpmClient(
+            base_url="HTTPS://npm.example.com/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            await client.login()
+
+            assert client._token is None
+            assert client._cookie_auth is True
+
+    @pytest.mark.asyncio
+    async def test_login_no_token_in_body_or_cookie_raises(self, httpx_mock):
+        """A 200 login with no token in body and no __Host-Http-token
+        cookie is a protocol error and must raise, not store None."""
+        httpx_mock.add_response(
+            method="POST",
+            url="http://localhost:81/api/tokens",
+            json={"expires": "2099-12-31T23:59:59Z"},
+        )
+
+        async with NpmClient(
+            base_url="http://localhost:81/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            with pytest.raises(NpmApiError, match="no token was returned"):
+                await client.login()
+
+    @pytest.mark.asyncio
     async def test_login_invalid_credentials(self, httpx_mock):
         """Test login with invalid credentials."""
         httpx_mock.add_response(
@@ -401,9 +606,7 @@ class TestProxyHostLocations:
             assert "locations" not in _api_request_body(httpx_mock, "POST")
 
     @pytest.mark.asyncio
-    async def test_update_preserves_locations_when_omitted(
-        self, httpx_mock, mock_token_response
-    ):
+    async def test_update_preserves_locations_when_omitted(self, httpx_mock, mock_token_response):
         """Update without locations must re-send the existing list (no drop)."""
         httpx_mock.add_response(
             method="POST",
@@ -436,9 +639,7 @@ class TestProxyHostLocations:
                 assert "access_list_id" not in loc
 
     @pytest.mark.asyncio
-    async def test_update_replaces_locations_when_provided(
-        self, httpx_mock, mock_token_response
-    ):
+    async def test_update_replaces_locations_when_provided(self, httpx_mock, mock_token_response):
         """An explicit locations list replaces the existing one entirely."""
         httpx_mock.add_response(
             method="POST",
@@ -482,9 +683,7 @@ class TestProxyHostLocations:
         """Preserved locations keep an explicitly set access_list_id."""
         host_with_acl = {
             **MOCK_HOST_WITH_LOCATIONS,
-            "locations": [
-                {**MOCK_HOST_WITH_LOCATIONS["locations"][0], "access_list_id": 5}
-            ],
+            "locations": [{**MOCK_HOST_WITH_LOCATIONS["locations"][0], "access_list_id": 5}],
         }
         httpx_mock.add_response(
             method="POST",

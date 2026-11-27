@@ -15,9 +15,14 @@ class ForwardScheme(StrEnum):
 
 
 class TokenResponse(BaseModel):
-    """Response from the login/token endpoint."""
+    """Response from the login/token endpoint.
 
-    token: str
+    Stock NPM returns the JWT in the body. NPMPlus (2026-10-22+) returns
+    only ``{"expires": ...}`` in the body and sets the token as a signed
+    ``__Host-Http-token`` cookie instead, so ``token`` may be absent.
+    """
+
+    token: str | None = None
     expires: datetime
 
 
