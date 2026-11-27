@@ -252,7 +252,14 @@ class NpmClient:
 
         Returns:
             List of AuditLogEntry objects
+
+        Raises:
+            ValueError: If limit or offset is negative
         """
+        if limit < 0:
+            raise ValueError(f"limit must be non-negative, got {limit}")
+        if offset < 0:
+            raise ValueError(f"offset must be non-negative, got {offset}")
         response = await self._request("GET", "/audit-log")
         data = response.json()
         entries = [AuditLogEntry(**entry) for entry in data]

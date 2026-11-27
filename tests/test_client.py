@@ -714,3 +714,15 @@ class TestAuditLog:
             r for r in httpx_mock.get_requests(method="GET") if "/audit-log" in str(r.url)
         ]
         assert api_requests and not api_requests[0].url.params
+
+    @pytest.mark.httpx_mock(assert_all_responses_were_requested=False)
+    @pytest.mark.asyncio
+    async def test_negative_limit_rejected(self, httpx_mock):
+        with pytest.raises(ValueError, match="limit must be non-negative"):
+            await self._fetch(httpx_mock, total=10, limit=-1)
+
+    @pytest.mark.httpx_mock(assert_all_responses_were_requested=False)
+    @pytest.mark.asyncio
+    async def test_negative_offset_rejected(self, httpx_mock):
+        with pytest.raises(ValueError, match="offset must be non-negative"):
+            await self._fetch(httpx_mock, total=10, limit=1, offset=-2)
