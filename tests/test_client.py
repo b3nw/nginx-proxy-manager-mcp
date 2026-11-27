@@ -225,6 +225,74 @@ class TestNpmClientAuth:
             assert "s%3Acookie-jwt" not in req.headers.get("authorization", "")
 
     @pytest.mark.asyncio
+    async def test_status_probe_does_not_send_session_cookie(self, httpx_mock):
+        """The unauthenticated GET / status probe may hit a different app
+        behind the same hostname; it must neither send nor update the
+        NPMPlus session cookie (R2-P2)."""
+        httpx_mock.add_response(
+            method="POST",
+            url="https://npm.example.com/api/tokens",
+            json={"expires": "2099-12-31T23:59:59Z"},
+            headers={
+                "Set-Cookie": (
+                    "__Host-Http-token=s%3Acookie-jwt.abc123; "
+                    "Path=/; HttpOnly; Secure; SameSite=Strict"
+                )
+            },
+        )
+        httpx_mock.add_response(
+            method="GET",
+            url="https://npm.example.com/",
+            json={"version": {"version": "2.12.0", "title": "Nginx Proxy Manager"}},
+            headers={"Set-Cookie": "__Host-Http-token=s%3Aother-app; Path=/; Secure"},
+        )
+
+        async with NpmClient(
+            base_url="https://npm.example.com/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            await client.login()
+            status = await client.get_status()
+
+            assert status.version == {
+                "version": "2.12.0",
+                "title": "Nginx Proxy Manager",
+            }
+            probe = [r for r in httpx_mock.get_requests() if r.url.path == "/"]
+            assert len(probe) == 1
+            assert "cookie" not in probe[0].headers
+            assert "authorization" not in probe[0].headers
+            # The probe response must not overwrite the API session cookie
+            assert client._client.cookies.get("__Host-Http-token") == "s%3Acookie-jwt.abc123"
+
+    @pytest.mark.asyncio
+    async def test_login_npmplus_uppercase_https_scheme(self, httpx_mock):
+        """An uppercase HTTPS:// API URL is still HTTPS; the Secure-cookie
+        check must use the parsed scheme, not a case-sensitive prefix."""
+        httpx_mock.add_response(
+            method="POST",
+            url="https://npm.example.com/api/tokens",
+            json={"expires": "2099-12-31T23:59:59Z"},
+            headers={
+                "Set-Cookie": (
+                    "__Host-Http-token=s%3Acookie-jwt.abc123; "
+                    "Path=/; HttpOnly; Secure; SameSite=Strict"
+                )
+            },
+        )
+
+        async with NpmClient(
+            base_url="HTTPS://npm.example.com/api",
+            identity="test@test.com",
+            secret="password",
+        ) as client:
+            await client.login()
+
+            assert client._token is None
+            assert client._cookie_auth is True
+
+    @pytest.mark.asyncio
     async def test_login_no_token_in_body_or_cookie_raises(self, httpx_mock):
         """A 200 login with no token in body and no __Host-Http-token
         cookie is a protocol error and must raise, not store None."""

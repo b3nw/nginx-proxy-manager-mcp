@@ -50,6 +50,10 @@ class NpmClient:
         self._token_expires: datetime | None = None
         self._cookie_auth = False
         self._client = httpx.AsyncClient(timeout=timeout)
+        # Separate cookie-less client for the unauthenticated status probe:
+        # GET / may be routed to a different app on the same hostname, so it
+        # must never send (or overwrite) the NPMPlus session cookie.
+        self._probe_client = httpx.AsyncClient(timeout=timeout)
 
     async def __aenter__(self) -> "NpmClient":
         """Async context manager entry."""
@@ -60,8 +64,9 @@ class NpmClient:
         await self.close()
 
     async def close(self) -> None:
-        """Close the HTTP client."""
+        """Close the HTTP clients."""
         await self._client.aclose()
+        await self._probe_client.aclose()
 
     # -------------------------------------------------------------------------
     # Authentication
@@ -116,7 +121,7 @@ class NpmClient:
             # left over in the shared jar by a previous session.
             cookie_token = response.cookies.get("__Host-Http-token")
             if cookie_token:
-                if not self.base_url.startswith("https://"):
+                if response.request.url.scheme != "https":
                     raise NpmAuthenticationError(
                         "NPMPlus returned the token as a Secure "
                         "__Host-Http-token cookie; cookie authentication "
@@ -223,7 +228,7 @@ class NpmClient:
         """Get NPM health/status information."""
         # Status endpoint doesn't require auth
         try:
-            response = await self._client.get(f"{self.base_url.replace('/api', '')}/")
+            response = await self._probe_client.get(f"{self.base_url.replace('/api', '')}/")
             return HealthStatus(status="online", version=response.json().get("version"))
         except Exception:
             # Fallback - try authenticated endpoint
