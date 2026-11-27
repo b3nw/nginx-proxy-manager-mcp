@@ -84,6 +84,9 @@ NPM_PROXY_DEFAULTS='{"certificate_id": 24, "ssl_forced": true, "block_exploits":
 | `forward_scheme` | string | `"http"` | Backend protocol (`http` or `https`) |
 | `certificate_id` | int | `0` | SSL certificate ID (use `list_certificates` to find) |
 | `ssl_forced` | bool | `true` | Force HTTPS redirect |
+| `hsts_enabled` | bool | `true` | Enable HSTS |
+| `hsts_subdomains` | bool | `false` | Include subdomains in HSTS |
+| `http2_support` | bool | `true` | Enable HTTP/2 |
 | `block_exploits` | bool | `true` | Enable common exploit blocking |
 | `allow_websocket_upgrade` | bool | `true` | Allow WebSocket connections |
 | `access_list_id` | int | `0` | Access list ID (use `list_access_lists` to find) |
